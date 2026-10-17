@@ -1,0 +1,241 @@
+<title>AAS Planner Roadmap</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Sora:wght@500;600&display=swap">
+<style>
+/* Layout: product board. Header with stage counts, tabs for Roadmap (three release columns), Backlog (ranked list), Blocked, Done and declined. Same light sky-blue family as the app mock-up. */
+:root{
+  --brand:#2f7fd8; --bg:#f5f8fc; --surface:#ffffff; --surface-2:#eef4fb; --ink:#14243a; --muted:#56677d; --line:#d9e3ef;
+  --ok:#1f8a5b; --ok-bg:#e6f5ee; --warn:#b26a00; --warn-bg:#fff3df; --bad:#c23b4c; --bad-bg:#fde9ec;
+  --brand-tint:color-mix(in oklab,var(--brand) 11%,var(--surface)); --brand-soft:color-mix(in oklab,var(--brand) 22%,var(--surface)); --brand-strong:color-mix(in oklab,var(--brand) 82%,#000);
+  --font-ui:"Figtree",system-ui,-apple-system,"Segoe UI",sans-serif; --font-display:"Sora","Figtree",system-ui,sans-serif;
+  --shadow:0 1px 2px rgba(20,36,58,.06),0 4px 14px rgba(20,36,58,.05);
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0e1621;--surface:#152030;--surface-2:#1b2940;--ink:#e4ecf6;--muted:#9aabc0;--line:#27364c;--ok:#4cc28d;--ok-bg:#17352a;--warn:#e7a43c;--warn-bg:#3a2c12;--bad:#ef7486;--bad-bg:#3d1c24;--brand-strong:color-mix(in oklab,var(--brand) 60%,#fff);--shadow:0 1px 2px rgba(0,0,0,.3);color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0e1621;--surface:#152030;--surface-2:#1b2940;--ink:#e4ecf6;--muted:#9aabc0;--line:#27364c;--ok:#4cc28d;--ok-bg:#17352a;--warn:#e7a43c;--warn-bg:#3a2c12;--bad:#ef7486;--bad-bg:#3d1c24;--brand-strong:color-mix(in oklab,var(--brand) 60%,#fff);--shadow:0 1px 2px rgba(0,0,0,.3);color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font:15px/1.5 var(--font-ui)}
+button,input,select,textarea{font:inherit;color:inherit}
+h1,h2,h3{font-family:var(--font-display);font-weight:600;line-height:1.25;margin:0;text-wrap:balance}
+h1{font-size:1.5rem} h2{font-size:1.05rem} h3{font-size:.95rem}
+p{margin:0}
+:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+.wrap{max-width:1240px;margin:0 auto;padding-block:22px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:18px}
+.head{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:12px}
+.head p{color:var(--muted);margin-top:4px;max-width:70ch}
+.stats{display:flex;flex-wrap:wrap;gap:8px}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:9px;padding:6px 12px;font-size:.84rem;color:var(--muted)}
+.stat b{color:var(--ink);font-variant-numeric:tabular-nums;margin-right:4px}
+.bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
+.tabs{display:flex;flex-wrap:wrap;gap:2px;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:3px}
+.tabs button{border:0;background:transparent;padding:6px 13px;border-radius:7px;cursor:pointer;color:var(--muted);font-weight:500}
+.tabs button[aria-selected="true"]{background:var(--surface);color:var(--ink);font-weight:600;box-shadow:var(--shadow)}
+.filters{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+input[type=search],input[type=text],select,textarea{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:7px 10px;min-width:0;width:100%}
+textarea{min-height:80px;resize:vertical}
+.btn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--surface);padding:7px 13px;border-radius:8px;cursor:pointer;font-weight:600;font-size:.88rem;white-space:nowrap}
+.btn:hover{border-color:var(--brand)}
+.btn.primary{background:var(--brand);border-color:var(--brand);color:#fff}
+.btn.sm{padding:3px 8px;font-size:.78rem;font-weight:600}
+.btn.icon{padding:3px 7px;min-width:28px;justify-content:center}
+.btn.danger{color:var(--bad)}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+.cols{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;align-items:start}
+@media (max-width:900px){.cols{grid-template-columns:1fr}}
+.col{background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.colhead{display:flex;justify-content:space-between;align-items:baseline;gap:8px;padding:2px 4px}
+.colhead span{color:var(--muted);font-size:.82rem}
+.list{display:flex;flex-direction:column;gap:10px}
+.item{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:11px 12px;display:flex;flex-direction:column;gap:7px;box-shadow:var(--shadow);min-width:0}
+.item .top{display:flex;gap:10px;align-items:flex-start;justify-content:space-between}
+.rank{font-family:var(--font-display);font-weight:600;color:var(--brand-strong);font-size:.82rem;min-width:26px;font-variant-numeric:tabular-nums}
+.title{font-weight:600;line-height:1.35;flex:1;min-width:0;overflow-wrap:anywhere}
+.detail{color:var(--muted);font-size:.86rem;overflow-wrap:anywhere}
+.meta{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.chip{font-size:.72rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:2px 7px;border-radius:5px;background:var(--brand-tint);color:var(--brand-strong)}
+.chip.size{background:var(--surface-2);color:var(--muted)}
+.chip.block{background:var(--warn-bg);color:var(--warn);text-transform:none;letter-spacing:0;font-weight:600}
+.actions{display:flex;flex-wrap:wrap;gap:5px;align-items:center;border-top:1px dashed var(--line);padding-top:7px}
+.actions .grow{flex:1}
+.empty{color:var(--muted);font-size:.88rem;padding:10px 4px}
+.notice{border-radius:10px;padding:10px 14px;font-size:.88rem;background:var(--warn-bg);border:1px solid color-mix(in oklab,var(--warn) 30%,transparent)}
+.overlay{position:fixed;inset:0;background:rgba(10,20,35,.45);display:grid;place-items:center;z-index:20;padding:16px}
+.modal{background:var(--surface);border-radius:14px;max-width:560px;width:100%;max-height:calc(100% - 20px);overflow:auto;padding:20px;display:flex;flex-direction:column;gap:12px;box-shadow:0 20px 60px rgba(0,0,0,.25)}
+.field{display:flex;flex-direction:column;gap:4px}
+.field label{font-size:.8rem;font-weight:600;color:var(--muted)}
+.fgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,150px),1fr));gap:10px}
+.toast{position:fixed;bottom:calc(18px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:9px;z-index:30;font-size:.9rem;max-width:calc(100% - 32px)}
+.legend{font-size:.82rem;color:var(--muted)}
+</style>
+
+<div class="wrap">
+  <div class="head">
+    <div><h1>AAS Time Off Planner: roadmap and backlog</h1><p>Add ideas to the backlog, rank them, and promote them into a release when they are ready. Lower rank number means higher priority within a stage.</p></div>
+    <button class="btn primary" id="addBtn">Add item</button>
+  </div>
+  <div class="stats" id="stats"></div>
+  <div class="bar">
+    <div class="tabs" role="tablist" id="tabs"></div>
+    <div class="filters"><input type="search" id="q" placeholder="Search items" aria-label="Search items" style="width:200px"><select id="area" aria-label="Filter by area" style="width:auto"></select></div>
+  </div>
+  <div id="notice"></div>
+  <div id="board"></div>
+  <p class="legend">Stages run Backlog, then Later (v1.2), Next (v1.1), Now (v1), then Done. Promote moves an item one stage toward Now and places it last in that stage. Blocked items wait on something outside our control.</p>
+</div>
+<div id="layer"></div>
+
+<script>
+"use strict";
+const STAGES = [
+  {id:"now", name:"Now", sub:"v1, first working version"},
+  {id:"next", name:"Next", sub:"v1.1"},
+  {id:"later", name:"Later", sub:"v1.2"},
+  {id:"backlog", name:"Backlog", sub:"Not scheduled"},
+  {id:"blocked", name:"Blocked", sub:"Waiting on an outside dependency"},
+  {id:"done", name:"Done", sub:"Shipped"},
+  {id:"declined", name:"Declined", sub:"Decided against"}
+];
+const LADDER = ["backlog","later","next","now","done"];
+const AREAS = ["Platform","Security","Plans and accrual","Requests and approvals","Calendar","Reports","Integrations","Compliance","Mobile","Admin"];
+const TABS = [["roadmap","Roadmap"],["backlog","Backlog"],["blocked","Blocked"],["closed","Done and declined"]];
+const S = { items:[], tab:"roadmap", q:"", area:"", ready:false, dbOk:true, readOnly:false, modal:null, confirmDel:null };
+try { S.tab = localStorage.getItem("aas-roadmap-tab") || "roadmap"; } catch(e){}
+let db = null;
+
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const stageName = id => STAGES.find(s=>s.id===id)?.name || id;
+function toast(m){ let el=document.querySelector(".toast"); if(!el){el=document.createElement("div");el.className="toast";el.setAttribute("role","status");document.body.appendChild(el);} el.textContent=m; clearTimeout(toast.t); toast.t=setTimeout(()=>el.remove(),3000); }
+function inStage(id){ return S.items.filter(i=>i.stage===id).sort((a,b)=>(a.rank??0)-(b.rank??0)); }
+function visible(list){ const q=S.q.toLowerCase(); return list.filter(i=>(!S.area||i.area===S.area)&&(!q||(i.title+" "+(i.detail||"")+" "+(i.blocker||"")).toLowerCase().includes(q))); }
+
+async function write(id, data, del){
+  if (!db || S.readOnly) { toast("This view can't change the board."); return false; }
+  try {
+    const ref = db.collection("items").doc(id);
+    if (del) await ref.delete(); else await ref.update({...data, updatedAt:new Date().toISOString()});
+    return true;
+  } catch(e){
+    if (e && e.code==="invalid_argument"){ S.readOnly=true; render(); toast("You can view this board but not change it."); }
+    else if (e && e.code==="quota_exceeded") toast("The board is full. Delete some declined items first.");
+    else toast("Couldn't save. Try again in a moment.");
+    return false;
+  }
+}
+async function create(data){
+  if (!db || S.readOnly) { toast("This view can't change the board."); return; }
+  try { const now=new Date().toISOString(); await db.collection("items").add({...data, addedAt:now, updatedAt:now}); }
+  catch(e){ if (e && e.code==="invalid_argument"){ S.readOnly=true; render(); toast("You can view this board but not change it."); } else toast("Couldn't add the item. Try again."); }
+}
+function lastRank(stage){ const l=inStage(stage); return l.length ? (l[l.length-1].rank ?? 0) + 10 : 10; }
+function move(item, dir){
+  const l=inStage(item.stage); const i=l.findIndex(x=>x.id===item.id); const j=i+dir;
+  if (j<0||j>=l.length) return;
+  const n=l[j], beyond=l[j+dir];
+  const r = beyond ? ((n.rank??0)+(beyond.rank??0))/2 : (n.rank??0) + dir*10;
+  write(item.id,{rank:r});
+}
+function promote(item, dir){
+  let to;
+  if (item.stage==="blocked"||item.stage==="declined") to = "backlog";
+  else { const k=LADDER.indexOf(item.stage)+dir; if (k<0||k>=LADDER.length) return; to=LADDER[k]; }
+  write(item.id,{stage:to, rank:lastRank(to)}).then(ok=>ok&&toast(`Moved to ${stageName(to)}.`));
+}
+
+function card(item, idx, list){
+  const st=item.stage, k=LADDER.indexOf(st);
+  const up = st==="blocked"||st==="declined" ? "Back to backlog" : (k>=0 && k<LADDER.length-1 ? (LADDER[k+1]==="done"?"Mark done":`Promote to ${stageName(LADDER[k+1])}`) : "");
+  const down = k>0 ? `Move to ${stageName(LADDER[k-1])}` : "";
+  const ro = S.readOnly || !db;
+  return `<article class="item">
+    <div class="top"><span class="rank" title="Priority within ${esc(stageName(st))}">#${idx+1}</span><span class="title">${esc(item.title)}</span></div>
+    ${item.detail?`<p class="detail">${esc(item.detail)}</p>`:""}
+    <div class="meta">${item.area?`<span class="chip">${esc(item.area)}</span>`:""}${item.size?`<span class="chip size">Size ${esc(item.size)}</span>`:""}${item.blocker?`<span class="chip block">Blocked by: ${esc(item.blocker)}</span>`:""}</div>
+    ${ro?"":`<div class="actions">
+      <button class="btn sm icon" data-a="up" data-id="${item.id}" ${idx===0?"disabled":""} aria-label="Raise priority">&uarr;</button>
+      <button class="btn sm icon" data-a="down" data-id="${item.id}" ${idx===list.length-1?"disabled":""} aria-label="Lower priority">&darr;</button>
+      <span class="grow"></span>
+      ${down?`<button class="btn sm" data-a="demote" data-id="${item.id}">${esc(down)}</button>`:""}
+      ${up?`<button class="btn sm" data-a="promote" data-id="${item.id}">${esc(up)}</button>`:""}
+      <button class="btn sm" data-a="edit" data-id="${item.id}">Edit</button>
+      ${S.confirmDel===item.id?`<button class="btn sm danger" data-a="delYes" data-id="${item.id}">Confirm delete</button><button class="btn sm" data-a="delNo">Keep</button>`:`<button class="btn sm danger" data-a="del" data-id="${item.id}" aria-label="Delete">Delete</button>`}
+    </div>`}
+  </article>`;
+}
+function column(stageId){
+  const st=STAGES.find(s=>s.id===stageId); const all=inStage(stageId); const list=visible(all);
+  return `<section class="col" aria-label="${esc(st.name)}"><div class="colhead"><h2>${esc(st.name)} <span>${esc(st.sub)}</span></h2><span>${all.length}</span></div>
+    <div class="list">${list.length?list.map(i=>card(i,all.indexOf(i),all)).join(""):`<p class="empty">${all.length?"No items match the filter.":"Nothing here yet."}</p>`}</div></section>`;
+}
+function render(){
+  document.getElementById("stats").innerHTML = STAGES.map(s=>`<span class="stat"><b>${S.items.filter(i=>i.stage===s.id).length}</b>${esc(s.name)}</span>`).join("");
+  document.getElementById("tabs").innerHTML = TABS.map(([k,l])=>`<button role="tab" data-tab="${k}" aria-selected="${S.tab===k}">${l}</button>`).join("");
+  const areaSel=document.getElementById("area"); if (!areaSel.options.length) areaSel.innerHTML = `<option value="">All areas</option>` + AREAS.map(a=>`<option>${esc(a)}</option>`).join("");
+  document.getElementById("addBtn").hidden = S.readOnly || !db;
+  const n=document.getElementById("notice");
+  n.innerHTML = !S.dbOk ? `<div class="notice">The board's saved items can't load in this view. Open it from claude.ai while signed in.</div>` : S.readOnly ? `<div class="notice">You can view this board. Ask the owner for edit access to change it.</div>` : "";
+  const b=document.getElementById("board");
+  if (!S.ready && S.dbOk){ b.innerHTML = `<p class="empty">Loading items…</p>`; return; }
+  if (S.ready && !S.items.length){ b.innerHTML = `<div class="col"><p class="empty">The board is empty. Use Add item to put the first idea in the backlog.</p></div>`; return; }
+  if (S.tab==="roadmap") b.innerHTML = `<div class="cols">${column("now")}${column("next")}${column("later")}</div>`;
+  else if (S.tab==="backlog") b.innerHTML = `<div style="max-width:760px">${column("backlog")}</div>`;
+  else if (S.tab==="blocked") b.innerHTML = `<div style="max-width:760px">${column("blocked")}</div>`;
+  else b.innerHTML = `<div class="cols" style="grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr))">${column("done")}${column("declined")}</div>`;
+}
+function modal(){
+  const L=document.getElementById("layer"); const m=S.modal; if(!m){L.innerHTML="";return;}
+  const f=m.form;
+  L.innerHTML = `<div class="overlay" data-a="bg"><form class="modal" id="itemForm" aria-labelledby="mt">
+    <h2 id="mt">${m.id?"Edit item":"Add item"}</h2>
+    <div class="field"><label for="fTitle">Title</label><input type="text" id="fTitle" value="${esc(f.title)}" required maxlength="140" placeholder="What should the app do?"></div>
+    <div class="field"><label for="fDetail">Detail</label><textarea id="fDetail" maxlength="2000" placeholder="Why it matters, rules, acceptance notes">${esc(f.detail)}</textarea></div>
+    <div class="fgrid">
+      <div class="field"><label for="fStage">Stage</label><select id="fStage">${STAGES.map(s=>`<option value="${s.id}" ${s.id===f.stage?"selected":""}>${esc(s.name)} (${esc(s.sub)})</option>`).join("")}</select></div>
+      <div class="field"><label for="fArea">Area</label><select id="fArea">${AREAS.map(a=>`<option ${a===f.area?"selected":""}>${esc(a)}</option>`).join("")}</select></div>
+      <div class="field"><label for="fSize">Size</label><select id="fSize">${["S","M","L"].map(z=>`<option ${z===f.size?"selected":""}>${z}</option>`).join("")}</select></div>
+      ${m.id?"":`<div class="field"><label for="fPos">Priority</label><select id="fPos"><option value="bottom">Last in stage</option><option value="top">First in stage</option></select></div>`}
+    </div>
+    <div class="field"><label for="fBlock">Blocked by (only for blocked items)</label><input type="text" id="fBlock" value="${esc(f.blocker)}" maxlength="200" placeholder="For example: WorkLinks partner API documentation"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end"><button type="button" class="btn" data-a="close">Cancel</button><button type="submit" class="btn primary">${m.id?"Save":"Add item"}</button></div>
+  </form></div>`;
+  document.getElementById("fTitle").focus();
+}
+document.addEventListener("click", e=>{
+  const t=e.target.closest("[data-tab]"); if (t){ S.tab=t.dataset.tab; try{localStorage.setItem("aas-roadmap-tab",S.tab);}catch(err){} render(); return; }
+  const el=e.target.closest("[data-a]"); if(!el) return;
+  const a=el.dataset.a; const item=S.items.find(i=>i.id===el.dataset.id);
+  if (a==="bg"){ if (e.target===el){ S.modal=null; modal(); } return; }
+  if (a==="close"){ S.modal=null; modal(); return; }
+  if (!item && !["delNo"].includes(a)) return;
+  if (a==="up") move(item,-1); else if (a==="down") move(item,1);
+  else if (a==="promote") promote(item,1); else if (a==="demote") promote(item,-1);
+  else if (a==="edit"){ S.modal={id:item.id,form:{title:item.title,detail:item.detail||"",stage:item.stage,area:item.area||AREAS[0],size:item.size||"M",blocker:item.blocker||""}}; modal(); }
+  else if (a==="del"){ S.confirmDel=item.id; render(); }
+  else if (a==="delNo"){ S.confirmDel=null; render(); }
+  else if (a==="delYes"){ S.confirmDel=null; write(item.id,null,true).then(ok=>ok&&toast("Deleted.")); }
+});
+document.getElementById("addBtn").addEventListener("click", ()=>{ S.modal={id:null,form:{title:"",detail:"",stage:"backlog",area:AREAS[0],size:"M",blocker:""}}; modal(); });
+document.addEventListener("submit", async e=>{
+  if (e.target.id!=="itemForm") return; e.preventDefault();
+  const v=id=>document.getElementById(id)?.value.trim()??"";
+  const data={title:v("fTitle"),detail:v("fDetail"),stage:v("fStage"),area:v("fArea"),size:v("fSize"),blocker:v("fBlock")};
+  if (!data.title){ toast("Give the item a title."); return; }
+  const m=S.modal;
+  if (m.id){ const old=S.items.find(i=>i.id===m.id); if (old && old.stage!==data.stage) data.rank=lastRank(data.stage); const ok=await write(m.id,data); if(ok) toast("Saved."); }
+  else { const first=inStage(data.stage)[0]; data.rank = v("fPos")==="top" ? ((first?.rank ?? 10) - 10) : lastRank(data.stage); await create(data); toast(`Added to ${stageName(data.stage)}.`); }
+  S.modal=null; modal();
+});
+document.getElementById("q").addEventListener("input", e=>{ S.q=e.target.value; render(); });
+document.getElementById("area").addEventListener("change", e=>{ S.area=e.target.value; render(); });
+document.addEventListener("keydown", e=>{ if (e.key==="Escape" && S.modal){ S.modal=null; modal(); } });
+
+render();
+(async()=>{
+  try { db = await window.claude?.use?.("db"); } catch(e){ db = null; }
+  if (!db){ S.dbOk=false; render(); return; }
+  db.collection("items").onSnapshot(snap=>{
+    S.items = snap.docs.map(d=>({id:d.id, ...d.data()}));
+    S.ready=true; render();
+  }, err=>{ S.dbOk=false; render(); });
+  render();
+})();
+</script>

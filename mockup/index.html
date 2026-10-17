@@ -225,7 +225,7 @@ const TENANTS = [
    personas:{employee:"n1",manager:"n2",admin:"n4"}, hoursPerDay:7.5, escalationDays:10,
    holidays:[["2026-01-01","New Year's Day"],["2026-02-16","Family Day"],["2026-04-03","Good Friday"],["2026-05-18","Victoria Day"],["2026-07-01","Canada Day"],["2026-08-03","Civic Holiday"],["2026-09-07","Labour Day"],["2026-10-12","Thanksgiving"],["2026-12-25","Christmas Day"],["2026-12-28","Boxing Day (observed)"]],
    plans:[
-    {id:"vac",name:"Vacation",color:"--c-vac",unit:"days",method:"Monthly, credited at start of month",freq:"monthly",yearStart:"January 1",carry:"cap",carryDays:5,carryExpiry:"March 31",approval:"manager",escalate:"admin",visibility:"name",feed:"Out of office",cancelApproval:true,statutory:true,
+    {id:"vac",name:"Vacation",color:"--c-vac",unit:"days",method:"Monthly, credited at start of month",freq:"monthly",yearStart:"January 1",carry:"cap",carryDays:5,carryExpiry:"March 31",approval:"manager",escalate:"next",visibility:"name",feed:"Out of office",cancelApproval:true,statutory:true,
       levels:[{id:"std",name:"Standard",days:15},{id:"sen",name:"Senior",days:20},{id:"exe",name:"Executive",days:25}],tenure:false},
     {id:"well",name:"Wellbeing",color:"--c-well",unit:"days",method:"Lump sum at plan year start",freq:"lump",yearStart:"January 1",carry:"none",approval:"auto",visibility:"ooo",feed:"Out of office",levels:[{id:"all",name:"All staff",days:3}]},
     {id:"sick",name:"Sick",color:"--c-sick",unit:"days",method:"Lump sum at plan year start",freq:"lump",yearStart:"January 1",carry:"none",approval:"auto",visibility:"ooo",feed:"Out of office",levels:[{id:"all",name:"All staff",days:6}]},
@@ -250,7 +250,7 @@ const TENANTS = [
     ["n4","vac","2026-11-16","2026-11-17","approved",""],["n4","vac","2026-06-22","2026-06-26","approved",""],
     ["n5","vac","2026-10-26","2026-10-30","pending","Moving apartments"],["n5","sick","2026-10-14","2026-10-14","approved",""],["n5","vac","2026-05-04","2026-05-08","approved",""],
     ["n6","vac","2026-11-09","2026-11-27","pending","Visiting family in Lagos"],
-    ["n7","well","2026-10-23","2026-10-23","approved",""],["n7","vac","2026-12-28","2026-12-31","approved",""],["n7","vac","2026-08-24","2026-09-04","approved",""],
+    ["n7","well","2026-10-23","2026-10-23","approved",""],["n7","vac","2026-10-26","2026-11-06","pending","Two weeks in Portugal"],["n7","vac","2026-12-28","2026-12-31","approved",""],["n7","vac","2026-08-24","2026-09-04","approved",""],
     ["n8","vac","2026-10-19","2026-10-23","approved","Conference then rest"],["n8","vac","2026-03-09","2026-03-13","approved",""],
     ["n9","pers","2026-10-30","2026-10-30","approved",""],["n9","vac","2026-09-14","2026-09-18","approved",""]
    ]},
@@ -291,10 +291,9 @@ for (const t of TENANTS){
   t.requests = t.requests.map(([pid,plan,s,e,status,comment]) => {
     const r = {id:nid("r"),pid,plan,start:s,end:e,halfStart:false,halfEnd:false,status,comment,kind:"new",created:addDays(s,-21)};
     r.days = workingDays(t,s,e,false,false);
-    r.steps = buildSteps(t,r);
-    if (status==="approved") r.steps.forEach(st=>st.status="approved");
     return r;
   });
+  for (const r of t.requests){ r.steps = buildSteps(t,r); if (r.status==="approved") r.steps.forEach(st=>st.status="approved"); }
   t.audit.push({at:"2026-10-16 16:02",who:"System",what:"Monthly accrual credited for October (Vacation)."},
                {at:"2026-10-15 09:14",who:t.id==="nw"?"Priya Shah":"Hannah Kim",what:"Exported Balance summary (XLSX)."},
                {at:"2026-10-14 11:30",who:"Platform owner",what:"Entered company console (support visit)."});
@@ -320,6 +319,16 @@ function workingDays(t,s,e,hs,he){
   if (he && !(dow(e)%6===0||isHoliday(t,e))) n -= .5;
   return n;
 }
+function isWork(t,d){ const w=dow(d); return !(w===0||w===6||isHoliday(t,d)); }
+function nextWork(t,d){ let x=addDays(d,1); while(!isWork(t,x)) x=addDays(x,1); return x; }
+function prevWork(t,d){ let x=addDays(d,-1); while(!isWork(t,x)) x=addDays(x,-1); return x; }
+/* Running total for escalation: this request plus any of the person's live bookings (any plan) that touch it with no working day in between. */
+function contiguous(t,r){
+  const others = t.requests.filter(x=>Array.isArray(x)?false:(x.pid===r.pid && x.id!==r.id && x.id!==r.replaces && !["denied","cancelled"].includes(x.status)));
+  let a=r.start, b=r.end, members=[], grew=true;
+  while (grew){ grew=false; for (const x of others){ if (members.includes(x)) continue; if (x.start<=nextWork(t,b) && x.end>=prevWork(t,a)){ members.push(x); if (x.start<a) a=x.start; if (x.end>b) b=x.end; grew=true; } } }
+  return {days: r.days + members.reduce((n,x)=>n+x.days,0), start:a, end:b, members};
+}
 function buildSteps(t,r){
   const plan = t.plans.find(p=>p.id===r.plan), person = t.people.find(p=>p.id===r.pid);
   const steps = [];
@@ -327,7 +336,7 @@ function buildSteps(t,r){
   const adminId = t.personas.admin;
   if (plan.approval==="admin" || !person.mgr) steps.push({who:"admin",pid:adminId,status:"pending"});
   else steps.push({who:"manager",pid:person.mgr,status:"pending"});
-  if (plan.escalate && r.days > t.escalationDays){
+  if (plan.escalate && contiguous(t,r).days > t.escalationDays){
     let second;
     if (plan.escalate==="next"){ const m = t.people.find(p=>p.id===person.mgr); second = m && m.mgr ? {who:"next",pid:m.mgr} : {who:"admin",pid:adminId}; }
     else second = {who:"admin",pid:adminId};
@@ -348,7 +357,7 @@ function entitlement(t,person,plan){
   else if (plan.freq==="quarterly"){ const q = Math.ceil(nowMonth/3); const startQ = Math.floor(startMonth/3); accrued = annual * Math.max(0,q-startQ)/4; }
   else accrued = annual * monthsInYear/12;
   const yearFull = annual * monthsInYear/12;
-  return {level:lvl, annual, accrued:r05(Math.ceil(accrued*2)/2), yearFull:Math.ceil(yearFull*2)/2, carry:a.carry||0};
+  return {level:lvl, annual, accrued:r05(accrued), yearFull:r05(yearFull), carry:a.carry||0};
 }
 function sickHours(person){
   const hire = person.hire > `${YEAR}-01-01` ? person.hire : `${YEAR}-01-01`;
@@ -384,7 +393,7 @@ function pendingFor(pid, adminView){
   return T().requests.filter(r => {
     const st = r.steps.find(s=>s.status==="pending");
     if (!st || !["pending","change-pending","cancel-pending"].includes(r.status)) return false;
-    return adminView ? (st.who==="admin" || st.pid===pid) : st.pid===pid;
+    return adminView ? true : st.pid===pid;
   });
 }
 function log(what){ const n = new Date(); const at = `${TODAY} ${String(n.getHours()).padStart(2,"0")}:${String(n.getMinutes()).padStart(2,"0")}`; const who = S.platformVisit ? "Platform owner" : me().name; T().audit.unshift({at,who,what}); }
@@ -492,7 +501,7 @@ function viewTeam(){
 function viewApprovals(){
   const t=T(), m=me(), isAdmin=S.role==="admin";
   const items = pendingFor(m.id,isAdmin);
-  return `${visitBanner()}<div class="pagehead"><div><h1>Approvals</h1><p>${items.length} waiting for you · Requests over ${t.escalationDays} working days need a second approval</p></div></div>
+  return `${visitBanner()}<div class="pagehead"><div><h1>Approvals</h1><p>${items.length} ${isAdmin?"open across the company":"waiting for you"} · Over ${t.escalationDays} working days in a row (adjacent bookings included) needs the next-level manager too</p></div></div>
   ${items.length?items.map(r=>{
     const pe=P(r.pid), pl=PL(r.plan), b=balance(t,r.pid,r.plan);
     const span = r.change || r;
@@ -504,7 +513,9 @@ function viewApprovals(){
     <div class="grid g2"><div class="kv" style="font-size:.9rem"><span>Plan</span><b>${esc(pl.name)}</b><span>Dates</span><b>${range(span.start,span.end)}</b>${r.change?`<span>Currently booked</span><b>${range(r.start,r.end)}</b>`:""}<span>Amount</span><b>${amt}</b><span>Balance after approval</span><b>${num(b.available + (r.status==="pending"?0:0),b.unit)} ${b.unit==="hours"?"hours":"days"}</b><span>Comment</span><b>${esc(r.comment)||"None"}</b></div>
     <div class="list small">${r.steps.map((s,i)=>`<div><span>Step ${i+1}: ${esc(P(s.pid).name)} <span class="muted">(${s.who==="manager"?"manager":s.who==="next"?"next-level manager":"HR admin"})</span></span><span class="pill ${s.status==="approved"?"ok":s.status==="pending"?"warn":"mute"}">${s.status==="waiting"?"Waiting":s.status==="pending"?"Needs decision":"Approved"}</span></div>`).join("")}</div></div>
     ${overlap.length?`<div class="alert warn"><b>Team overlap</b><span>${overlap.map(o=>`${esc(P(o.pid).name)} (${range(o.start,o.end)})`).join(", ")}</span></div>`:""}
-    ${stepIdx===0 && r.steps.length>1?`<div class="alert info"><b>Second approval</b><span>This request is over ${t.escalationDays} working days. After you approve, ${esc(P(r.steps[1].pid).name)} is notified to approve it too.</span></div>`:""}
+    ${(()=>{const c=contiguous(t,{...r,...(r.change||{}),replaces:r.id}); return c.members.length?`<div class="alert info"><b>Continuous absence</b><span>${num(c.days)} working days in a row (${range(c.start,c.end)}), including ${c.members.map(x=>`${esc(PL(x.plan).name)} ${range(x.start,x.end)}`).join(", ")}.</span></div>`:"";})()}
+    ${isAdmin && r.steps[stepIdx] && r.steps[stepIdx].pid!==m.id?`<div class="alert warn"><b>Waiting on ${esc(P(r.steps[stepIdx].pid).name)}</b><span>As HR admin you can decide on their behalf. Your decision is logged as an override.</span></div>`:""}
+    ${stepIdx===0 && r.steps.length>1?`<div class="alert info"><b>Second approval</b><span>This absence is over ${t.escalationDays} working days in a row. After you approve, ${esc(P(r.steps[1].pid).name)} is notified to approve it too.</span></div>`:""}
     <div class="row"><input type="text" id="cm-${r.id}" placeholder="Comment for ${esc(pe.name.split(" ")[0])} (required when declining)" style="flex:1;min-width:200px"><button class="btn primary" data-act="decide" data-v="${r.id}" data-d="approve">Approve</button><button class="btn danger" data-act="decide" data-v="${r.id}" data-d="deny">Decline</button></div>
     </section>`;}).join(""):`<section class="card"><p class="muted">You're all caught up. New requests appear here and arrive by email.</p></section>`}`;
 }
@@ -609,10 +620,10 @@ function planEditor(pl){
     <div class="field"><label>Plan year starts</label><select><option>${esc(pl.yearStart)}</option><option>April 1</option><option>Employee anniversary</option></select></div>
     <div class="field"><label>Unit</label><select><option ${pl.unit==="days"?"selected":""}>Days and half days</option><option ${pl.unit==="hours"?"selected":""}>Hours</option></select></div>
     <div class="field"><label>How time is earned</label><select><option>${esc(pl.method)}</option><option>Lump sum at plan year start</option><option>Lump sum on hire date, then each plan year</option><option>Semi-annual</option><option>Quarterly</option><option>Monthly</option><option>Per hours worked</option></select></div>
-    <div class="field"><label>First year</label><select><option>Prorated from start date, round up to half day</option><option>Prorated, round to nearest half day</option><option>Full amount</option></select></div>
+    <div class="field"><label>First year</label><select><option>Prorated from start date, round to nearest half day</option><option>Prorated, round up to half day</option><option>Full amount</option></select></div>
     <div class="field"><label for="carry">Year end</label><select id="carry" data-act="carry" data-plan="${pl.id}"><option value="none" ${pl.carry==="none"?"selected":""}>No carryover (resets to zero)</option><option value="cap" ${pl.carry==="cap"?"selected":""}>Carry up to ${pl.carryDays||5} ${pl.unit==="hours"?"hours":"days"}${pl.carryExpiry?`, use by ${pl.carryExpiry}`:""}</option><option value="all" ${pl.carry==="all"?"selected":""}>Carry everything</option><option value="max" ${pl.carry==="max"?"selected":""}>Carry everything, pause earning at a maximum balance</option></select></div>
     <div class="field"><label>Approval</label><select><option ${pl.approval==="auto"?"selected":""}>Automatic</option><option ${pl.approval==="manager"?"selected":""}>Manager</option><option ${pl.approval==="admin"?"selected":""}>HR admin</option></select></div>
-    <div class="field"><label>Second approval over ${t.escalationDays} days</label><select><option ${!pl.escalate?"selected":""}>None</option><option ${pl.escalate==="next"?"selected":""}>Next-level manager</option><option ${pl.escalate==="admin"?"selected":""}>HR admin</option></select></div>
+    <div class="field"><label for="esc">Second approval over ${t.escalationDays} days in a row</label><select id="esc" data-act="esc" data-plan="${pl.id}"><option value="" ${!pl.escalate?"selected":""}>Off</option><option value="next" ${pl.escalate==="next"?"selected":""}>Next-level manager</option><option value="admin" ${pl.escalate==="admin"?"selected":""}>HR admin</option></select></div>
     <div class="field"><label>Coworkers see</label><select><option ${pl.visibility==="name"?"selected":""}>Plan name</option><option ${pl.visibility==="ooo"?"selected":""}>Out of office only</option><option ${pl.visibility==="hidden"?"selected":""}>Nothing (hidden)</option></select></div>
     <div class="field"><label>Shows in calendars as</label><select><option>${esc(pl.feed)}</option><option>Busy</option><option>Free</option></select></div>
     ${pl.tenure!==undefined?`<div class="field"><label>Increase with years of service</label><select><option ${!pl.tenure?"selected":""}>Off</option><option ${pl.tenure?"selected":""}>On: +5 days at 5 years, effective on anniversary</option></select></div>`:""}
@@ -741,7 +752,7 @@ function reqModalHtml(){
   const hols = []; if (f.start && f.end && f.end>=f.start) for (let d=f.start; d<=f.end; d=addDays(d,1)){ const h=isHoliday(t,d); if (h && dow(d)%6) hols.push(h[1]); }
   const overlap = f.start&&f.end ? t.requests.filter(r=>r.pid!==person.id && r.status==="approved" && r.end>=f.start && r.start<=f.end && (P(r.pid).mgr===person.mgr)) : [];
   const own = f.start&&f.end ? t.requests.filter(r=>r.pid===person.id && r.id!==m.editing && !["denied","cancelled"].includes(r.status) && r.end>=f.start && r.start<=f.end) : [];
-  const draft={pid:person.id,plan:pl.id,days}; const steps=m.onBehalf&&f.autoApprove?[]:buildSteps(t,draft);
+  const draft={pid:person.id,plan:pl.id,days,start:f.start,end:f.end,id:"draft",replaces:m.editing}; const cont = f.start&&f.end&&days ? contiguous(t,draft) : {members:[]}; const steps=m.onBehalf&&f.autoApprove?[]:buildSteps(t,draft);
   const invalid = !f.start || !f.end || f.end<f.start || days<=0 || own.length || (m.onBehalf && !f.reason.trim());
   const title = m.editing ? (old.status==="approved"?"Change approved time off":"Edit request") : m.onBehalf ? `Add time off for ${person.name}` : "Request time off";
   return `<div class="overlay" data-act="closeBg"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="mt">
@@ -763,7 +774,8 @@ function reqModalHtml(){
     ${after!==null&&after<0&&days?(m.onBehalf?`<div class="alert warn"><b>Negative balance</b><span>HR can override. The balance goes to ${num(after,pl.unit)} and the override is logged.</span></div>`:`<div class="alert bad"><b>Not enough balance</b><span>This plan does not allow a negative balance. Shorten the request or choose another plan.</span></div>`):""}
     ${own.length?`<div class="alert bad"><b>Overlap</b><span>You already have time off on these dates (${own.map(r=>range(r.start,r.end)).join(", ")}).</span></div>`:""}
     ${overlap.length?`<div class="alert warn"><b>Team</b><span>${overlap.map(r=>`${esc(P(r.pid).name)} is out ${range(r.start,r.end)}`).join("; ")}.</span></div>`:""}
-    <span class="small">${steps.length?`Approval: ${steps.map(s=>esc(P(s.pid).name)+(s.who==="admin"?" (HR)":"")).join(", then ")}${steps.length>1?` <span class="muted">(over ${t.escalationDays} days needs a second approval)</span>`:""}`:"Approved automatically"}</span>
+    ${cont.members.length?`<span class="small muted">Joins up with ${cont.members.map(x=>`${esc(PL(x.plan).name)} ${range(x.start,x.end)}`).join(", ")}: ${num(cont.days)} working days in a row.</span>`:""}
+    <span class="small">${steps.length?`Approval: ${steps.map(s=>esc(P(s.pid).name)+(s.who==="admin"?" (HR)":"")).join(", then ")}${steps.length>1?` <span class="muted">(over ${t.escalationDays} working days in a row needs a second approval)</span>`:""}`:"Approved automatically"}</span>
    </div>
    <div class="row" style="justify-content:flex-end"><button class="btn" data-act="close">Cancel</button><button class="btn primary" data-act="submitReq" ${invalid||(after!==null&&after<0&&!m.onBehalf)?"disabled":""}>${m.editing?(old.status==="approved"?"Send change for approval":"Save changes"):steps.length?"Send request":"Book time off"}</button></div>
   </div></div>`;
@@ -813,7 +825,7 @@ function submitReq(){
     const r=t.requests.find(x=>x.id===m.editing);
     if (r.status==="approved" && !m.onBehalf){
       r.change={plan:f.plan,start:f.start,end:f.end,halfStart:f.halfStart,halfEnd:f.halfEnd,days,comment:f.comment};
-      r.status="change-pending"; r.steps=buildSteps(t,{pid:r.pid,plan:f.plan,days});
+      r.status="change-pending"; r.steps=buildSteps(t,{pid:r.pid,plan:f.plan,days,start:f.start,end:f.end,id:"chg",replaces:r.id});
       if (!r.steps.length){ Object.assign(r,r.change); delete r.change; r.status="approved"; toast("Change applied. This plan approves automatically."); }
       else toast(`Change sent to ${P(r.steps[0].pid).name}. Your original dates stay booked until it's approved.`);
       log(`${person.name}: changed ${pl.name} ${range(f.start,f.end)} (was ${range(r.start,r.end)}).`);
@@ -921,6 +933,7 @@ document.addEventListener("input", e => {
   if (["rQ","rLoc","rPlan","whoFrom","whoTo"].includes(id)){ S.filters[id]=el.value; render(); return; }
   if (el.dataset.act==="levelDays"){ const pl=PL(el.dataset.plan); const l=pl.levels.find(x=>x.id===el.dataset.v); l.days=Number(el.value)||0; render(); return; }
   if (el.dataset.act==="carry"){ PL(el.dataset.plan).carry=el.value; render(); return; }
+  if (el.dataset.act==="esc"){ PL(el.dataset.plan).escalate=el.value||null; log(`Second approval for ${PL(el.dataset.plan).name} set to ${el.value||"off"}.`); render(); return; }
 });
 document.addEventListener("change", e => {
   if (e.target.id==="logoFile"){ const file=e.target.files[0]; if(!file) return; if (file.size>1.5e6){ toast("Choose an image under 1.5 MB."); return; } const rd=new FileReader(); rd.onload=()=>{ T().logo=rd.result; log("Logo updated."); render(); toast("Logo updated."); }; rd.readAsDataURL(file); }

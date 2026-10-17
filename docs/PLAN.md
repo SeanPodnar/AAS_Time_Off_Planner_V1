@@ -1,7 +1,8 @@
-# AAS Time Off Planner: Requirements Plan (Draft 4)
+# AAS Time Off Planner: Requirements Plan (Draft 5)
 
 Status: draft for review. Stage 2 of 5 (plan, clarify, mock-up, v1, iterate).
 Date: 2026-10-17
+Changes in Draft 5: N1 to N7 answered (approval routing, rounding, running-total escalation with an off switch, salaried US staff, automatic overrides); backlog and roadmap moved to a separate tracking board.
 Changes in Draft 4: answers to 18 to 23 (exports, report audience and format, salary data and finance role to backlog, free hosting until release, branding and theming).
 Changes in Draft 3: plan levels with admin-set days and statutory warnings (5.2, 5.8); hours accrual unit and lump sum for all regions (5.3, 5.4); jurisdiction carryover overrides with warnings (5.6); Jira moved to roadmap and backlog (8.3, 11, 12).
 Changes in Draft 2: owner answers to questions 1 to 8 and 10 to 17 folded in; research on accrual law, approvals, hosting and Atlassian added. Decisions marked DECIDED, recommendations marked REC, open items marked OPEN.
@@ -46,7 +47,7 @@ Copied from others: BambooHR's policy model and balance projection; Timetastic's
 DECIDED: tenant admins never see other tenants. Only the platform owner can.
 
 DECIDED: a person can have more than one manager (e.g. line manager plus project lead).
-REC: each person has exactly one primary manager, who is the approver. Secondary managers see the person's absences and balances and get notified, but do not approve. This avoids two managers approving and denying the same request. OPEN: confirm.
+DECIDED: each person has exactly one primary manager, who is the approver. Secondary managers see the person's absences and balances and get notified, but do not approve. Absences over 10 working days in a row also go to the primary manager's own manager (section 6).
 
 ## 4. Functional requirements
 
@@ -98,7 +99,7 @@ All settings are per plan, chosen in the plan builder. Plans are unlimited and a
   - per hours worked, at a set ratio (e.g. 1 hour per 30 hours worked, the most common US paid sick leave formula), or
   - as a fixed number of hours per period.
 - Requests stay in days and half days. Each employee has standard hours per day (default 8.0; 7.5 common in Canada), and a full day deducts that many hours. Fractional hours left over stay on the balance and show as both hours and days ("22.5 h, about 2.8 days").
-- Hours worked source: salaried exempt employees are assumed to work their standard week (40 hours unless set otherwise), which most state laws accept. Hourly or non-exempt employees need actual hours: from WorkLinks payroll data once the integration exists, or a per-pay-period CSV import until then. OPEN: are any employees hourly or non-exempt? If none, hours-worked accrual can run fully automatically on the standard week.
+- Hours worked source: salaried exempt employees are assumed to work their standard week (40 hours unless set otherwise), which most state laws accept. Hourly or non-exempt employees need actual hours: from WorkLinks payroll data once the integration exists, or a per-pay-period CSV import until then. DECIDED: all US employees are salaried and not overtime-eligible, so hours-worked accrual runs automatically on each person's standard week. Hourly employees and overtime eligibility are in the backlog.
 
 ### 5.4 Accrual method and frequency (DECIDED)
 - Lump sum (front-load): the full period entitlement is granted at once. Available for every plan and every region. Grant point options:
@@ -112,7 +113,7 @@ All settings are per plan, chosen in the plan builder. Plans are unlimited and a
 ### 5.5 First year (DECIDED: earned from start date)
 - Entitlement is prorated from the employee's start date to the end of the first plan year.
 - REC proration rule: count remaining months, including the start month if the start date is on or before the 15th. Example: 15 days per year, start date June 10, plan year January to December: 7 months remaining, 15 x 7/12 = 8.75 days.
-- Rounding to half days (days unit): REC round up (8.75 becomes 9.0), because rounding down can put a Canadian employee below their statutory minimum. Configurable per plan: up, down, nearest. Hours-unit plans round to 0.25 hours.
+- Rounding to half days (days unit), DECIDED: nearest half day (8.75 becomes 9.0, 8.2 becomes 8.0). Configurable per plan: nearest, up, down. Because nearest can round down, the statutory check (5.8) runs on the rounded figure and warns if it lands below a minimum. Hours-unit plans round to 0.25 hours.
 - With periodic grants, the first partial period is prorated the same way, then normal periods apply.
 
 ### 5.6 Year end and carryover
@@ -130,7 +131,7 @@ Jurisdiction overrides (DECIDED: account for state-level differences, with warni
   - Vacation forfeiture conditional: e.g. Illinois (allowed only with reasonable notice and opportunity to use), Massachusetts. Allowed with a warning and a required notice date.
   - Paid sick leave carryover: state-specific caps on carryover or on total balance, e.g. California, Colorado (up to 48 hours), Connecticut (up to 40 hours); New Mexico and Washington prohibit accrual caps. Front-loaded (lump sum) sick plans meet many states' carryover rules, but not all; some cities (e.g. San Francisco) require carryover even when front-loaded.
   - Canada: statutory vacation cannot simply expire in any province; untaken statutory vacation must be scheduled or paid out. Amounts above the statutory minimum follow the plan rule.
-- Admin setting per tenant: "Apply jurisdiction overrides automatically" (REC: on) or "Warn only".
+- DECIDED: jurisdiction overrides apply automatically at year end. Admins still see every override in the year-end preview and the audit log.
 - Warnings appear in three places: when a plan is saved, in the year-end preview report (sent to admins 30 days before year end, listing each employee, the plan rule, the override and the days affected), and on the employee's record.
 - The rules table is data, versioned and dated, so a law change is a data update with an effective date, not a code change. It needs a yearly review, and an HR or legal check at launch.
 
@@ -162,15 +163,17 @@ The app tracks time, not money. Canadian vacation pay percentages (4%, 6%, 8%) a
 
 DECIDED:
 - Per plan, approval mode is one of: auto-approve, primary manager, or tenant admin.
-- Escalation threshold: if a request exceeds N working days (default 10), a second approval step is added after the first. The second approver is either the approver's own manager (next level) or a tenant admin, chosen per plan. The second approver is notified when step one is approved.
+- Second approval: when an absence runs more than 10 working days in a row, the request also needs the primary manager's own manager (next level). The next-level manager is notified when step one is approved. If there is no next-level manager, the step falls back to a tenant admin.
+- Running total: the 10-day test counts the new request plus any of the person's existing approved or pending bookings, in any plan, that join it with no working day in between (weekends and public holidays do not break a run). Example: a Friday wellbeing day followed by two weeks of vacation is 11 days in a row and needs the second approval.
+- Off switch: the second approval can be turned off per plan, and the threshold (default 10) is set per company.
 
-Rules and edge cases (REC):
-- Request is pending until all required steps approve. Any denial ends it.
-- If the requester has no manager (top of the tree) or is their own manager's manager, the request goes to a tenant admin.
-- If a step has no next-level manager, it falls back to a tenant admin.
+Rules and edge cases:
+- A request is pending until every required step approves. Any denial ends it, and a denial needs a comment.
+- If the requester has no manager, the request goes to a tenant admin.
 - An approver cannot approve their own request.
-- Backup approver: a manager can delegate approvals for a date range (e.g. while on leave). Requests pending more than N days send a reminder, then escalate to an admin.
-- Amendments and cancellations of approved time follow the same route, judged on the new length.
+- HR admins see every open request and can decide on behalf of a manager who is away; the decision is logged as an override.
+- Backup approver: a manager can delegate approvals for a date range. Requests pending more than N days send a reminder, then escalate to an admin.
+- Amendments and cancellations of approved time off follow the same route, judged on the new dates and the new running total.
 - Every approval action is logged with time, actor and comment.
 
 ## 7. Security, privacy and tenancy
@@ -295,6 +298,7 @@ Deferred by choice:
 - Blackout periods (dates when requests are blocked or need admin approval).
 - Maximum number of people off at once per team.
 - Hourly requests (hours accrual is in v1; booking stays in days and half days).
+- Hourly employees and overtime eligibility (actual hours worked from payroll, overtime-eligible flag per person).
 - Native mobile apps.
 - Per-tenant dedicated database (architecture ready, section 7.1).
 
@@ -302,13 +306,14 @@ Declined:
 - Confluence "Who's out" page.
 - Bradford Factor report (see section 9).
 
-## 13. Open questions
-All original questions answered. The mock-up uses the recommended answer for each item below until you decide.
-New:
-- N1. Primary manager approves; secondary managers view only. Confirm.
-- N2. Are any of the four companies federally regulated (banking, telecom, interprovincial transport)? That switches Canadian rules to the Canada Labour Code.
-- N3. Jira (needed before v1.1, not v1): is each company on its own Jira Cloud site, and on Standard or Premium?
-- N4. Rounding: round first-year proration up to the nearest half day (recommended) or nearest?
-- N5. Escalation default of 10 working days for a second approval step: confirm the number and whether it counts the whole request or a rolling total.
-- N6. Are any US employees hourly or non-exempt? If so, hours-worked accrual needs actual hours from payroll each pay period (section 5.3).
-- N7. Jurisdiction overrides: apply automatically (recommended) or warn only?
+## 13. Decisions log (N1 to N7)
+- N1: primary manager approves; over 10 working days in a row adds the next-level manager.
+- N2: no company is federally regulated; provincial rules apply.
+- N3: each company has its own Jira Cloud site, Standard or Premium. Design for both; capacity features only where Premium.
+- N4: first-year proration rounds to the nearest half day.
+- N5: second approval above 10 working days, counted as a running total of joined-up bookings; can be turned off.
+- N6: US staff are salaried and not overtime-eligible. Hourly and overtime eligibility are in the backlog.
+- N7: jurisdiction overrides apply automatically at year end.
+
+## 14. Backlog and roadmap
+The roadmap and backlog now live on a separate tracking board, where items can be added, reprioritised and promoted between stages: https://claude.ai/artifact/YE4qrkARfucrRoSDgnRD1e. Sections 11 and 12 above are a snapshot as of Draft 5; the board is the source of truth from here on.
