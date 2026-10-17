@@ -1,7 +1,8 @@
-# AAS Time Off Planner: Requirements Plan (Draft 3)
+# AAS Time Off Planner: Requirements Plan (Draft 4)
 
 Status: draft for review. Stage 2 of 5 (plan, clarify, mock-up, v1, iterate).
 Date: 2026-10-17
+Changes in Draft 4: answers to 18 to 23 (exports, report audience and format, salary data and finance role to backlog, free hosting until release, branding and theming).
 Changes in Draft 3: plan levels with admin-set days and statutory warnings (5.2, 5.8); hours accrual unit and lump sum for all regions (5.3, 5.4); jurisdiction carryover overrides with warnings (5.6); Jira moved to roadmap and backlog (8.3, 11, 12).
 Changes in Draft 2: owner answers to questions 1 to 8 and 10 to 17 folded in; research on accrual law, approvals, hosting and Atlassian added. Decisions marked DECIDED, recommendations marked REC, open items marked OPEN.
 
@@ -198,7 +199,12 @@ Rules and edge cases (REC):
 - Not recommended for this requirement: Vercel (sources conflict on whether it offers Canadian-only hosting; its global edge network caches outside Canada) and Neon (no Canadian region found). Supabase does document a Canada (Central) region and is an acceptable alternative for the database.
 - Note: PIPEDA does not itself require Canadian hosting, so this is your contractual or policy choice, and a sound one for HR data. Quebec Law 25 requires a privacy impact assessment before personal information leaves Quebec; Canadian hosting keeps that simple.
 
-### 7.5 Other controls
+### 7.5 Branding and theming (DECIDED)
+- Default theme: light blues in the family of the Asensean logo, kept light in tone, with dark text for contrast.
+- Per tenant: upload a logo, pick a primary and accent colour (or a preset). The app derives hover, border and tint shades and checks text contrast against WCAG AA; a colour that fails is adjusted or refused with a message.
+- Light and dark mode for every theme.
+
+### 7.6 Other controls
 - Sensitive plans (sick, wellbeing, medical) private by default: coworkers and feeds see "Out of office" only.
 - TLS everywhere, encryption at rest, comments encrypted at the field level.
 - Immutable audit log: logins, approvals, admin edits, balance adjustments, exports, tenant switches, API key use.
@@ -227,37 +233,53 @@ Backlog, not addressable now:
 - (a) Native Jira capacity. Blocked: no public API found for time off in Jira Plans or in the Capacity view from Atlassian's 2026 Summer Release (manual entry only, Premium or Enterprise, fixed 40-hour week). Confidence: moderate. Trigger to pick up: Atlassian publishes a Capacity or Plans time-off API. Review quarterly.
 - Forge app (Atlassian's native app platform) that shows availability inside Jira issues and boards, reading the (d) API. Trigger: (b) and (d) in use and teams asking for in-Jira views.
 
-### 8.4 Exports
-- CSV, XLSX (formatted, with summary tab), Google Sheets push (OPEN, question 18).
+### 8.4 Exports (DECIDED)
+- v1: CSV and XLSX download (formatted, with a summary tab).
+- Google Sheets push: backlog.
 
-## 9. Reports
+## 9. Reports (DECIDED)
 
-Each with filters (location, team, manager, plan, date range), chart plus table, and PDF/XLSX export:
+Audience: each company's HR team and finance. Reports are admin-only in v1; managers and employees never see them. A separate finance access level is in the backlog.
+
+Design rules for every report (best practice, no house template):
+- Title, company name, filters applied, and "Run on <date time, time zone> by <name>" at the top of the screen, the PDF and the XLSX.
+- Plain column labels with units ("Days remaining", "Hours accrued"), no codes or abbreviations.
+- Every column sortable; filters for location, team, manager, plan, level and date range; a search box.
+- Totals row; numbers right-aligned; consistent date format (e.g. 17 Oct 2026).
+- One chart only where it helps, always with the table beneath.
+- XLSX exports keep the run label, freeze the header row, and turn on filters.
+
+Reports:
 1. Who's out (today, week, range).
 2. Balance summary per employee and plan, with plan year end projection.
-3. Year-end forfeiture preview (days at risk of loss, statutory warnings).
+3. Year-end forfeiture preview (days at risk of loss, jurisdiction overrides, statutory warnings).
 4. Absence rate and days lost by team, month, plan.
 5. Utilisation: entitlement used to date versus expected pace; flags people not taking leave.
 6. Approval metrics: volume, time to approve, denial rate per approver.
 7. Payroll reconciliation: absences per pay period by WorkLinks code, post-close corrections highlighted.
 8. Audit report.
+9. Untaken leave liability in hours (DECIDED): unused balance per employee and plan, converted to hours at each person's standard hours per day, with totals by team, location and company. Dollar values are in the backlog.
 10. Compliance: employees below a statutory minimum now or within 90 days (coming anniversaries), and jurisdiction overrides applied at the last year end.
-9. Accrued leave liability in dollars: only if pay rates are supplied (OPEN, question 19).
 
 Bradford Factor excluded by default: it penalises short repeated absences and can produce discriminatory outcomes for people with disabilities or chronic conditions.
 
 ## 10. Proposed technical stack
 - Next.js (React, TypeScript), responsive web; no native mobile apps in v1.
-- PostgreSQL with RLS on AWS RDS, ca-central-1; Drizzle ORM (first-class RLS support).
+- PostgreSQL with RLS; Drizzle ORM (first-class RLS support).
 - Auth.js (or self-hosted identity server) with Google, Microsoft Entra ID and email link; TOTP MFA.
-- Background jobs for accruals, year-end, feeds, payroll files, calendar pushes, Jira sync.
-- AWS SES (ca-central-1) for email; S3 (ca-central-1) for files.
-- OPEN: confirm budget and any preferred provider (question 21).
+- Background jobs for accruals, year-end, feeds, payroll files, calendar pushes.
+- Email and file storage in Canada.
+
+Cost and hosting by phase (DECIDED: free until a working version is ready, then reassess):
+- Build phase (free): develop locally and on a free managed Postgres tier in Canada (Supabase free plan, Canada Central region). Free tiers pause idle projects and have small storage limits, which is fine for building.
+- Rule for the free phase: synthetic data only. No real employee names, dates or balances go into any free or non-Canadian service. This keeps the data residency promise intact without paying for it yet.
+- Security is the same in the free phase as in production: RLS, MFA, encrypted secrets, audit log. Only scale and uptime differ.
+- At release: move to paid Canadian hosting (REC: AWS Montreal with Calgary backups, section 7.4), then load real data. Expected cost for 4 companies and under 100 people is modest, roughly the price of a small database and app server per month; to be priced at reassessment.
 
 ## 11. Roadmap
 - Stage 3, mock-up: clickable prototype of employee, manager, admin and platform screens with two sample tenants. No backend.
-- Stage 4, v1: tenants and domains, auth, people and managers, plan levels and accrual engine (days and hours units, lump sum and periodic, jurisdiction overrides), requests/approvals/amendments with escalation, balances, team calendar, ICS feeds, CSV/XLSX export, WorkLinks file export (including hours-worked import for hours-based plans), reports 1 to 4 and 6, compliance report, audit log.
-- v1.1: Google/M365 direct calendar push; Jira absence issues (b) and availability API with webhooks (d); Google Sheets export; remaining reports; WorkLinks API if access is granted (replaces the hours-worked CSV import).
+- Stage 4, v1: tenants and domains, auth, people and managers, plan levels and accrual engine (days and hours units, lump sum and periodic, jurisdiction overrides), requests/approvals/amendments with escalation, balances, team calendar, ICS feeds, CSV/XLSX export, WorkLinks file export (including hours-worked import for hours-based plans), reports 1 to 4, 6, 9 (liability in hours) and 10 (compliance), audit log.
+- v1.1: Google/M365 direct calendar push; Jira absence issues (b) and availability API with webhooks (d); remaining reports; WorkLinks API if access is granted (replaces the hours-worked CSV import).
 - v1.2: Slack/Teams notifications and approvals.
 
 ## 12. Backlog
@@ -267,6 +289,9 @@ Blocked on an outside dependency:
 - WorkLinks live API. Waiting on WorkLinks partner documentation; file export covers it until then.
 
 Deferred by choice:
+- Google Sheets export (v1 has CSV and XLSX download).
+- Salary data: a separate admin-only table and panel holding pay rates, used to show leave liability in dollars. Admin access only, never visible to managers or employees, encrypted at the field level, every view logged.
+- Finance access level: a role that can see reports and the salary panel without HR permissions over people and requests.
 - Blackout periods (dates when requests are blocked or need admin approval).
 - Maximum number of people off at once per team.
 - Hourly requests (hours accrual is in v1; booking stays in days and half days).
@@ -278,7 +303,7 @@ Declined:
 - Bradford Factor report (see section 9).
 
 ## 13. Open questions
-Carried over: 18 to 23 (9 is answered by Draft 3, section 5.6).
+All original questions answered. The mock-up uses the recommended answer for each item below until you decide.
 New:
 - N1. Primary manager approves; secondary managers view only. Confirm.
 - N2. Are any of the four companies federally regulated (banking, telecom, interprovincial transport)? That switches Canadian rules to the Canada Labour Code.
