@@ -32,5 +32,12 @@ Next.js (TypeScript) on PostgreSQL 16. See `../docs/PLAN.md` for requirements an
 - Keys are encrypted with AES-256-GCM using `MFA_ENCRYPTION_KEY` (never stored in the database); recovery codes are stored as hashes. A code can't be used twice, and 5 wrong codes lock the session out for 15 minutes.
 - Employees and managers are not asked for a code yet.
 
+## People and settings (HR admin)
+- `/people`: directory with search (name, email, team, location, manager, job title) and active, inactive or all.
+- Add or edit: name, email, job title, employee number, start date, province or state, team and location (created by typing a new name), primary manager (approves), other managers (see and get notified), role, hours per day, work days for part-time staff.
+- Rules: managers must be active and in the same company; no one manages themselves and no management loops; at least one active HR admin stays; deactivating signs the person out everywhere. Every change is audit-logged with what changed.
+- `/settings`: company time zone and the second-approval threshold (default 10 working days in a row).
+- Employees and managers get a 404 on these pages.
+
 ## Not yet
 Google and Microsoft 365 sign-in is the next branch. Production email (Amazon SES in Canada) comes with the release item.

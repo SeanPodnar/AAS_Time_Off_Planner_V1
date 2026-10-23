@@ -1,7 +1,6 @@
 import Link from "next/link";
-import { brandInk } from "@/lib/color";
 import { currentSite, requireCompanyUser } from "@/lib/session";
-import { signOut } from "./login/actions";
+import { CompanyHeader, brandStyle } from "./components/CompanyHeader";
 
 export const dynamic = "force-dynamic";
 
@@ -19,17 +18,9 @@ export default async function Home() {
 
   const { user } = await requireCompanyUser();
   const t = site.tenant;
-  const style = { "--brand": t.brandColor, "--brand-ink": brandInk(t.brandColor) } as React.CSSProperties;
-  const role = user.role === "admin" ? "HR admin" : user.isManager ? "Manager" : "Employee";
   return (
-    <div style={style}>
-      <header className="top">
-        <span className="mark" aria-hidden="true">{t.shortLabel.slice(0, 2).toUpperCase()}</span>
-        <strong>{t.shortLabel}</strong>
-        <span style={{ flex: 1 }} />
-        <span className="small">{user.fullName} · {role}</span>
-        <form action={signOut}><button className="btn" type="submit">Sign out</button></form>
-      </header>
+    <div style={brandStyle(t)}>
+      <CompanyHeader tenant={t} user={user} current="/" />
       <main className="wrap">
         <h1>{t.shortLabel} time off</h1>
         <p className="muted">You&apos;re signed in. Balances and requests arrive with the next roadmap items.</p>
