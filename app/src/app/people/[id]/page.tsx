@@ -9,10 +9,14 @@ import { CompanyHeader, brandStyle } from "../../components/CompanyHeader";
 import { PersonForm } from "../PersonForm";
 import { setStatusAction } from "../actions";
 import { assignPersonAction } from "../../plans/actions";
+import { companyFor } from "@/lib/requests/company";
+import { approvalCount, listPersonRequests, requestablePlans } from "@/lib/requests/service";
+import { RequestsTable } from "../../requests/RequestsTable";
+import { AddTimeOffForm, AdjustBalanceForm } from "../../requests/AdminTimeOffForms";
 
 export const dynamic = "force-dynamic";
 
-export default async function EditPersonPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ saved?: string; status?: string; error?: string; assigned?: string; assignError?: string }> }) {
+export default async function EditPersonPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ saved?: string; status?: string; error?: string; assigned?: string; assignError?: string; added?: string; adjusted?: string; cancel?: string; cancelError?: string }> }) {
   const { site, user, actor } = await requireAdmin();
   const { id } = await params;
   const sp = await searchParams;
@@ -23,10 +27,14 @@ export default async function EditPersonPage({ params, searchParams }: { params:
   const settings = await getSettings(site.tenant.id, site.tenant.country);
   const today = todayIn(settings.timeZone);
   const { asOf, balances } = await currentBalances(site.tenant.id, settings.timeZone, person.id);
+  const company = await companyFor(site);
+  const [requests, bookable, approvals] = await Promise.all([listPersonRequests(company, actor, person.id), requestablePlans(company, actor, person.id), approvalCount(company, actor)]);
+  const planOptions = bookable.map((p) => ({ id: p.id, name: p.name }));
+  const trackedOptions = bookable.filter((p) => p.tracked).map((p) => ({ id: p.id, name: p.name }));
   const active = person.status === "active";
   return (
     <div style={brandStyle(site.tenant)}>
-      <CompanyHeader tenant={site.tenant} user={user} current="/people" />
+      <CompanyHeader tenant={site.tenant} user={user} current="/people" approvals={approvals} />
       <main className="wrap">
         <div className="pagehead">
           <div><h1>{person.fullName}</h1><p className="muted">{person.jobTitle ?? "No job title"} · {active ? "Active" : "Inactive"}</p></div>
@@ -78,6 +86,16 @@ export default async function EditPersonPage({ params, searchParams }: { params:
               </div>
             </form>
           )}
+        </section>
+        <section className="card">
+          <h2>Time off</h2>
+          {sp.added && <p className="notice ok" role="status">{sp.added === "approved" ? "Time off added and approved." : "Time off added. It is waiting for approval."}</p>}
+          {sp.adjusted && <p className="notice ok" role="status">Balance adjusted.</p>}
+          {sp.cancel && <p className="notice ok" role="status">{sp.cancel === "cancelled" ? "Cancelled." : "Cancellation sent for approval."}</p>}
+          {sp.cancelError && <p className="notice warn" role="alert">{sp.cancelError}</p>}
+          <RequestsTable rows={requests} viewerId={user.personId} returnTo={`/people/${person.id}`} showEdit={false} empty="No requests yet." />
+          <AddTimeOffForm personId={person.id} plans={planOptions} />
+          <AdjustBalanceForm personId={person.id} plans={trackedOptions} today={today} />
         </section>
       </main>
     </div>

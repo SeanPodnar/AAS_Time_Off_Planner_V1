@@ -63,3 +63,8 @@ ul.tight { margin: 0; padding-left: 1.1em; }
 ul.tight.err li { color: var(--bad); }
 input[type=file] { padding: 6px; }
 .big { font-size: 1.8rem; font-weight: 700; margin: 4px 0 0; }
+.badge { display: inline-block; margin-left: 6px; min-width: 1.4em; padding: 0 6px; border-radius: 999px; background: var(--brand); color: var(--brand-ink); font-size: .75rem; font-weight: 700; text-align: center; }
+textarea { font: inherit; color: inherit; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; width: 100%; }
+.stack { display: flex; flex-direction: column; gap: 8px; }
+.btn.small { padding: 4px 10px; font-size: .85rem; }
+td.wrapcell { white-space: normal; min-width: 180px; }

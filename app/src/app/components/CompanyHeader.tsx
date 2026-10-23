@@ -8,15 +8,15 @@ export function brandStyle(t: TenantBranding) {
   return { "--brand": t.brandColor, "--brand-ink": brandInk(t.brandColor) } as React.CSSProperties;
 }
 
-export function CompanyHeader({ tenant, user, current }: { tenant: TenantBranding; user: SessionUser; current?: string }) {
+export function CompanyHeader({ tenant, user, current, approvals }: { tenant: TenantBranding; user: SessionUser; current?: string; approvals?: number }) {
   const role = user.role === "admin" ? "HR admin" : user.isManager ? "Manager" : "Employee";
-  const links = [{ href: "/", label: "My time off" }, ...(user.role === "admin" ? [{ href: "/people", label: "People" }, { href: "/plans", label: "Plans" }, { href: "/settings", label: "Settings" }] : [])];
+  const links = [{ href: "/", label: "My time off" }, ...(user.role === "admin" || user.isManager ? [{ href: "/approvals", label: "Approvals" }] : []), ...(user.role === "admin" ? [{ href: "/people", label: "People" }, { href: "/plans", label: "Plans" }, { href: "/settings", label: "Settings" }] : [])];
   return (
     <header className="top">
       <span className="mark" aria-hidden="true">{tenant.shortLabel.slice(0, 2).toUpperCase()}</span>
       <strong>{tenant.shortLabel}</strong>
       <nav className="topnav" aria-label="Main">
-        {links.map((l) => <Link key={l.href} href={l.href} aria-current={current === l.href ? "page" : undefined}>{l.label}</Link>)}
+        {links.map((l) => <Link key={l.href} href={l.href} aria-current={current === l.href ? "page" : undefined}>{l.label}{l.href === "/approvals" && approvals ? <span className="badge" aria-label={`${approvals} waiting`}>{approvals}</span> : null}</Link>)}
       </nav>
       <span style={{ flex: 1 }} />
       <span className="small">{user.fullName} · {role}</span>

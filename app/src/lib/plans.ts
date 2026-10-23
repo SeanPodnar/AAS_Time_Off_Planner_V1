@@ -72,6 +72,7 @@ const planObject = z
     payoutUnused: bool(false),
     approvalMode: en(APPROVALS, "manager", "Choose who approves."),
     secondApproval: bool(true),
+    cancelNeedsApproval: bool(true),
     negativeLimit: reqNum("Enter an amount, or 0 for none.", 0, 100000, "Enter 0 or more.", "Use 100000 or fewer.", 0),
     waitingPeriodDays: reqInt("Enter a whole number of days.", 0, 730, "Use 0 to 730 days.", 0),
     visibility: en(VISIBILITIES, "name", "Choose what coworkers see."),
@@ -152,7 +153,7 @@ function toPlan(r: Record<string, unknown>, levels: PlanLevel[], assignedCount: 
     firstYearProration: r.first_year_proration as boolean, rounding: r.rounding as PlanRow["rounding"], carryover: r.carryover as PlanRow["carryover"],
     carryoverCap: num(r.carryover_cap), carryoverExpiryMonth: num(r.carryover_expiry_month), carryoverExpiryDay: num(r.carryover_expiry_day),
     maxBalance: num(r.max_balance), payoutUnused: r.payout_unused as boolean, approvalMode: r.approval_mode as PlanRow["approvalMode"],
-    secondApproval: r.second_approval as boolean, negativeLimit: Number(r.negative_limit), waitingPeriodDays: Number(r.waiting_period_days),
+    secondApproval: r.second_approval as boolean, cancelNeedsApproval: r.cancel_needs_approval as boolean, negativeLimit: Number(r.negative_limit), waitingPeriodDays: Number(r.waiting_period_days),
     visibility: r.visibility as PlanRow["visibility"], calendarStatus: r.calendar_status as PlanRow["calendarStatus"], counts: r.counts as PlanRow["counts"],
     tenureEnabled: r.tenure_enabled as boolean, active: r.active as boolean, levels, assignedCount,
   };
@@ -219,7 +220,7 @@ function parseLevels(rawLevels: unknown, none: boolean): { levels: CleanLevel[];
 const PLAN_COLUMNS = [
   "name", "category", "unit", "accrualMethod", "lumpSumTiming", "frequency", "creditTiming", "hoursWorkedRatio", "planYearStartMonth", "planYearStartDay",
   "firstYearProration", "rounding", "carryover", "carryoverCap", "carryoverExpiryMonth", "carryoverExpiryDay", "maxBalance", "payoutUnused", "approvalMode",
-  "secondApproval", "negativeLimit", "waitingPeriodDays", "visibility", "calendarStatus", "counts", "tenureEnabled", "active",
+  "secondApproval", "cancelNeedsApproval", "negativeLimit", "waitingPeriodDays", "visibility", "calendarStatus", "counts", "tenureEnabled", "active",
 ] as const;
 
 export async function savePlan(tenantId: string, actor: Actor, raw: unknown, id?: string): Promise<SaveResult> {
@@ -277,7 +278,7 @@ export async function savePlan(tenantId: string, actor: Actor, raw: unknown, id?
         credit_timing: p.creditTiming, hours_worked_ratio: p.hoursWorkedRatio, plan_year_start_month: p.planYearStartMonth, plan_year_start_day: p.planYearStartDay,
         first_year_proration: p.firstYearProration, rounding: p.rounding, carryover: p.carryover, carryover_cap: p.carryoverCap,
         carryover_expiry_month: p.carryoverExpiryMonth, carryover_expiry_day: p.carryoverExpiryDay, max_balance: p.maxBalance, payout_unused: p.payoutUnused,
-        approval_mode: p.approvalMode, second_approval: p.secondApproval, negative_limit: p.negativeLimit, waiting_period_days: p.waitingPeriodDays,
+        approval_mode: p.approvalMode, second_approval: p.secondApproval, cancel_needs_approval: p.cancelNeedsApproval, negative_limit: p.negativeLimit, waiting_period_days: p.waitingPeriodDays,
         visibility: p.visibility, calendar_status: p.calendarStatus, counts: p.counts, tenure_enabled: p.tenureEnabled, active: p.active,
       };
       let planId = id;
@@ -446,7 +447,7 @@ const BASE: Omit<PlanInput, "name" | "category" | "accrualMethod" | "levels"> = 
   unit: "days", lumpSumTiming: null, frequency: null, creditTiming: "start", hoursWorkedRatio: null,
   planYearStartMonth: 1, planYearStartDay: 1, firstYearProration: true, rounding: "nearest",
   carryover: "none", carryoverCap: null, carryoverExpiryMonth: null, carryoverExpiryDay: null, maxBalance: null, payoutUnused: false,
-  approvalMode: "manager", secondApproval: true, negativeLimit: 0, waitingPeriodDays: 0,
+  approvalMode: "manager", secondApproval: true, cancelNeedsApproval: true, negativeLimit: 0, waitingPeriodDays: 0,
   visibility: "name", calendarStatus: "out_of_office", counts: "working_days", tenureEnabled: false, active: true,
 };
 

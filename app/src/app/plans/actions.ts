@@ -12,7 +12,7 @@ const FIELDS = [
   "rounding", "carryover", "carryoverCap", "carryoverExpiryMonth", "carryoverExpiryDay", "maxBalance", "approvalMode", "negativeLimit", "waitingPeriodDays",
   "visibility", "calendarStatus", "counts",
 ];
-const BOOLEANS = ["firstYearProration", "payoutUnused", "secondApproval", "tenureEnabled", "active"];
+const BOOLEANS = ["firstYearProration", "payoutUnused", "secondApproval", "cancelNeedsApproval", "tenureEnabled", "active"];
 
 export async function savePlanAction(_prev: PlanFormState, form: FormData): Promise<PlanFormState> {
   const { site, actor } = await requireAdmin();

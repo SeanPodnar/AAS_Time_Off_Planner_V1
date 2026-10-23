@@ -596,7 +596,7 @@ export async function listPersonRequests(company: Company, actor: Actor, personI
   return withTenant(company.tenantId, (tx) => rows(tx, company, actor, tx`r.person_id = ${personId}`));
 }
 
-export type ApprovalRow = RequestRow & { mine: boolean; stepRole: string; run: number };
+export type ApprovalRow = RequestRow & { mine: boolean; stepRole: string; run: number; longRun: boolean };
 
 /**
  * Open approvals for the signed-in person: steps waiting on them, plus (for HR admins) every
@@ -610,13 +610,14 @@ export async function listApprovals(company: Company, actor: Actor): Promise<App
          and (s.approver_id = ${actor.personId} or ${actor.role === "admin"})`;
     if (open.length === 0) return [];
     const list = await rows(tx, company, actor, tx`r.id = any(${open.map((o) => o.request_id)}::uuid[])`);
+    const limit = await threshold(tx);
     const out: ApprovalRow[] = [];
     for (const r of list) {
       const o = open.find((x) => x.request_id === r.id)!;
       const who = (await person(tx, r.personId))!;
       const mineDays = (await tx`select day from request_days where request_id = ${r.id}`).map((x) => d(x.day));
       const others = (await liveDays(tx, r.personId, [r.id, ...(r.targetId ? [r.targetId] : [])])).map((x) => x.day);
-      out.push({ ...r, mine: o.approver_id === actor.personId || (o.role === "admin" && actor.role === "admin"), stepRole: o.role, run: runLength(scheduleFor(who), mineDays, others) });
+      out.push({ ...r, mine: o.approver_id === actor.personId || (o.role === "admin" && actor.role === "admin"), stepRole: o.role, ...(() => { const run = runLength(scheduleFor(who), mineDays, others); return { run, longRun: run > limit }; })() });
     }
     return out.sort((a, b) => a.startDate.localeCompare(b.startDate));
   });
