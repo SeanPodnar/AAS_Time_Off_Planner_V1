@@ -124,6 +124,7 @@ export function PlanForm({ plan, planId }: { plan: PlanInput; planId?: string })
             {field("waitingPeriodDays", "Waiting period (days)", text("waitingPeriodDays", plan.waitingPeriodDays, { type: "number", min: "0", max: "730" }), "Days after the start date before time can be booked.")}
           </div>
           {check("secondApproval", "Long requests need a second approver", plan.secondApproval, "The length is set in Settings.")}
+          {check("cancelNeedsApproval", "Cancelling approved time off needs approval", plan.cancelNeedsApproval, "When off, people can cancel their own approved time off at once.")}
         </fieldset>
 
         <fieldset>
