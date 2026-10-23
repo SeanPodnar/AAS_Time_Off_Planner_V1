@@ -53,6 +53,7 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 .seg{display:flex;flex-wrap:wrap;background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:3px;gap:2px}
 .seg button{border:0;background:transparent;padding:5px 11px;border-radius:7px;cursor:pointer;font-size:.86rem;color:var(--muted)}
 .seg button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:var(--shadow);font-weight:600}
+.cosel{width:auto;min-width:150px;font-weight:600}
 .seglabel{font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
 .who{display:flex;align-items:center;gap:8px;font-size:.88rem}
 .avatar{width:30px;height:30px;border-radius:50%;background:var(--brand-soft);color:var(--brand-strong);display:grid;place-items:center;font-weight:700;font-size:.78rem;flex:none}
@@ -70,7 +71,7 @@ main{padding-block:22px 40px;padding-left:max(16px,env(safe-area-inset-left,0px)
 .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);padding:16px 18px;min-width:0}
 .card>h2,.card>.cardhead{margin-bottom:12px}
 .cardhead{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
-.grid{display:grid;gap:14px}
+.grid{display:grid;gap:14px;align-content:start}
 .g2{grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr))}
 .bal{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,210px),1fr));gap:12px}
 .balcard{border:1px solid var(--line);border-radius:var(--r);padding:14px;background:var(--surface);display:flex;flex-direction:column;gap:8px;position:relative;overflow:hidden}
@@ -221,7 +222,7 @@ function nextStatStep(j, hire){
 
 /* ---------- sample data ---------- */
 const TENANTS = [
- { id:"nw", name:"Northwind Analytics", short:"NA", country:"Canada", domain:"timeoff.northwind-analytics.ca", sub:"northwind", brand:"#2f7fd8", logo:null,
+ { id:"nw", name:"Northwind Analytics Inc.", label:"Northwind", short:"NA", country:"Canada", domain:"timeoff.northwind-analytics.ca", sub:"northwind", brand:"#2f7fd8", logo:null,
    personas:{employee:"n1",manager:"n2",admin:"n4"}, hoursPerDay:7.5, escalationDays:10,
    holidays:[["2026-01-01","New Year's Day"],["2026-02-16","Family Day"],["2026-04-03","Good Friday"],["2026-05-18","Victoria Day"],["2026-07-01","Canada Day"],["2026-08-03","Civic Holiday"],["2026-09-07","Labour Day"],["2026-10-12","Thanksgiving"],["2026-12-25","Christmas Day"],["2026-12-28","Boxing Day (observed)"]],
    plans:[
@@ -254,7 +255,7 @@ const TENANTS = [
     ["n8","vac","2026-10-19","2026-10-23","approved","Conference then rest"],["n8","vac","2026-03-09","2026-03-13","approved",""],
     ["n9","pers","2026-10-30","2026-10-30","approved",""],["n9","vac","2026-09-14","2026-09-18","approved",""]
    ]},
- { id:"hp", name:"Harbor & Pine Co.", short:"HP", country:"United States", domain:"pto.harborandpine.com", sub:"harborpine", brand:"#3a8fc9", logo:null,
+ { id:"hp", name:"Harbor & Pine Company LLC", label:"Harbor & Pine", short:"HP", country:"United States", domain:"pto.harborandpine.com", sub:"harborpine", brand:"#3a8fc9", logo:null,
    personas:{employee:"h2",manager:"h1",admin:"h6"}, hoursPerDay:8, escalationDays:10,
    holidays:[["2026-01-01","New Year's Day"],["2026-01-19","Martin Luther King Jr. Day"],["2026-02-16","Presidents' Day"],["2026-05-25","Memorial Day"],["2026-06-19","Juneteenth"],["2026-07-03","Independence Day (observed)"],["2026-09-07","Labor Day"],["2026-11-26","Thanksgiving"],["2026-11-27","Day after Thanksgiving"],["2026-12-25","Christmas Day"]],
    plans:[
@@ -280,8 +281,8 @@ const TENANTS = [
    ]}
 ];
 const OTHER_TENANTS = [
-  {name:"Cedar Ridge Engineering",country:"Canada",seats:20,domain:"leave.cedarridge.ca",status:"Setup"},
-  {name:"Lakeshore Health Partners",country:"Canada",seats:11,domain:"lakeshore.aas-timeoff.ca",status:"Setup"}
+  {name:"Cedar Ridge Engineering Ltd.",label:"Cedar Ridge",country:"Canada",seats:20,domain:"leave.cedarridge.ca",status:"Setup"},
+  {name:"Lakeshore Health Partners Inc.",label:"Lakeshore",country:"Canada",seats:11,domain:"lakeshore.aas-timeoff.ca",status:"Setup"}
 ];
 
 /* hydrate requests */
@@ -414,10 +415,10 @@ function renderTop(){
   const inPlatform = S.role==="platform";
   const persona = inPlatform ? {name:"Platform owner"} : me();
   document.getElementById("top").innerHTML = `
-    <div class="brandmark">${inPlatform?`<span class="logo">AAS</span>`:logoHtml(t)}<div><b>${inPlatform?"AAS Time Off Planner":esc(t.name)}</b><small>${inPlatform?"All companies console":esc(t.domain)}</small></div></div>
+    <div class="brandmark">${inPlatform?`<span class="logo">AAS</span>`:logoHtml(t)}<div><b>${inPlatform?"AAS Time Off Planner":esc(t.label)}</b><small>${inPlatform?"All companies console":esc(t.domain)}</small></div></div>
     <div class="spacer"></div>
     <div class="row"><span class="seglabel">View as</span><div class="seg" role="group" aria-label="Prototype role">${ROLES.map(([k,l])=>`<button data-act="role" data-v="${k}" aria-pressed="${(S.role===k && !S.platformVisit) || (k==="platform"&&S.platformVisit)}">${l}</button>`).join("")}</div></div>
-    ${!inPlatform && !S.platformVisit ? `<div class="row"><span class="seglabel">Company</span><div class="seg" role="group" aria-label="Sample company">${TENANTS.map(x=>`<button data-act="tenant" data-v="${x.id}" aria-pressed="${x.id===S.tenant}">${esc(x.short)}</button>`).join("")}</div></div>`:""}
+    ${!inPlatform && !S.platformVisit ? `<div class="row"><label class="seglabel" for="tenantSel">Company</label><select id="tenantSel" class="cosel">${TENANTS.map(x=>`<option value="${x.id}" ${x.id===S.tenant?"selected":""}>${esc(x.label)}</option>`).join("")}</select></div>`:""}
     <div class="row"><span class="seglabel">Theme</span><div class="seg" role="group" aria-label="Colour theme">${[["dark","Dark"],["light","Light"],["device","Match device"]].map(([k,l])=>`<button data-act="theme" data-v="${k}" aria-pressed="${S.theme===k}">${l}</button>`).join("")}</div></div>
     <div class="who"><span class="avatar">${initials(persona.name)}</span><span>${esc(persona.name)}</span></div>`;
 }
@@ -434,7 +435,7 @@ function renderNav(){
 
 /* ---------- views ---------- */
 function visitBanner(){
-  return S.platformVisit ? `<div class="banner"><span>You are inside <b>${esc(T().name)}</b> as platform owner. This visit is recorded in the company's audit log.</span><button class="btn sm" data-act="exitVisit">Back to all companies</button></div>` : "";
+  return S.platformVisit ? `<div class="banner"><span>You are inside <b>${esc(T().label)}</b> as platform owner. This visit is recorded in the company's audit log.</span><button class="btn sm" data-act="exitVisit">Back to all companies</button></div>` : "";
 }
 function statusPill(r){
   const m = {approved:["ok","Approved"],pending:["warn","Pending"],denied:["bad","Declined"],cancelled:["mute","Cancelled"],"change-pending":["warn","Change pending"],"cancel-pending":["warn","Cancellation pending"]}[r.status];
@@ -562,6 +563,7 @@ function viewSync(){
   const feedRow = (label,url,id)=>`<div class="field"><label for="${id}">${label}</label><div class="row"><input type="text" id="${id}" value="${url}" readonly style="flex:1;min-width:220px"><button class="btn sm" data-act="copy" data-v="${id}">Copy link</button><button class="btn sm ghost" data-act="toast" data-v="Link reset. The old link stops working within a minute.">Reset link</button></div></div>`;
   return `<div class="pagehead"><div><h1>Calendar sync</h1><p>Add time off to Google Calendar, Outlook or Apple Calendar. Feeds include names and dates only.</p></div></div>
   <section class="card grid"><h2>Your feed links</h2>
+    <p class="small muted">Calendars appear as <b>${esc(t.label)} time off</b> and <b>${esc(t.label)} team</b>.</p>
     ${feedRow("My time off","" + personal,"f1")}
     ${S.role==="manager"?feedRow("My team's time off",team,"f2"):feedRow("My team's time off (names and dates)",team,"f2")}
     <div class="note">Keep these links private. Anyone with a link can see what it contains. Reset a link if it was shared by mistake.</div>
@@ -573,7 +575,7 @@ function viewSync(){
     <div><b>Apple Calendar</b><span class="muted">File, then New Calendar Subscription. Choose refresh every 5 minutes.</span></div>
     <div><b>Instant updates</b><span class="pill info">Coming in v1.1</span></div></div>
     <p class="small muted" style="margin-top:8px">Version 1.1 adds a direct connection to Google and Microsoft 365 that updates within seconds and can set your Outlook out-of-office status.</p></section>
-  <section class="card"><h2>What other people's calendars show</h2><div class="list small">${evs.map(r=>{const pe=P(r.pid), pl=PL(r.plan); return `<div><span>${esc(pe.name)}: ${pl.visibility==="name"?esc(pl.name):"Out of office"}</span><span class="muted">${range(r.start,r.end)} · ${esc(pl.feed)}</span></div>`}).join("")}</div>
+  <section class="card"><h2>What other people's calendars show</h2><div class="list small">${evs.map(r=>{const pe=P(r.pid), pl=PL(r.plan); return `<div><span>${esc(t.label)}: ${esc(pe.name)}, ${pl.visibility==="name"?esc(pl.name):"Out of office"}</span><span class="muted">${range(r.start,r.end)} · ${esc(pl.feed)}</span></div>`}).join("")}</div>
   <p class="small muted" style="margin-top:8px">No comments, balances or private plan names are ever included.</p></section></div>`;
 }
 /* ---------- admin ---------- */
@@ -714,14 +716,22 @@ function viewIntegrations(){
   </div>`;
 }
 const PRESETS = [["Sky","#2f7fd8"],["Harbor","#3a8fc9"],["Glacier","#4a9fd8"],["Lake","#2b6cb0"],["Teal","#1f8f9a"],["Slate","#4b6584"]];
+function labelError(v){ v=v.trim(); if (!v) return "The short label is required."; if (v.length>24) return "Keep it to 24 characters or fewer."; const all=[...TENANTS.filter(x=>x.id!==S.tenant),...OTHER_TENANTS]; if (all.some(x=>x.label.toLowerCase()===v.toLowerCase())) return `"${v}" is already used by another company.`; return ""; }
 function viewBranding(){
   const t=T(); const c=contrast(t.brand,"#ffffff"); const ok=c>=4.5;
-  return `${visitBanner()}<div class="pagehead"><div><h1>Branding</h1><p>Logo and colours for ${esc(t.name)}. People see this on the sign-in page and throughout the app at ${esc(t.domain)}.</p></div></div>
+  return `${visitBanner()}<div class="pagehead"><div><h1>Branding</h1><p>Name, logo and colours for ${esc(t.name)}. People see this on the sign-in page and throughout the app at ${esc(t.domain)}.</p></div></div>
   <div class="grid g2">
   <section class="card grid"><h2>Logo</h2><div class="row"><span class="logo" style="width:64px;height:64px;font-size:1.2rem">${t.logo?`<img src="${t.logo}" alt="">`:esc(t.short)}</span><div class="grid" style="gap:6px"><label class="btn" for="logoFile">Upload logo</label><input type="file" id="logoFile" accept="image/png,image/svg+xml,image/jpeg" hidden>${t.logo?`<button class="btn sm ghost" data-act="clearLogo">Remove logo</button>`:""}<span class="small muted">PNG or SVG, square works best.</span></div></div></section>
   <section class="card grid"><h2>Colour</h2><div class="swatches">${PRESETS.map(([n,h])=>`<button class="swatch" style="background:${h}" data-act="brand" data-v="${h}" aria-pressed="${t.brand===h}" aria-label="${n}" title="${n}"></button>`).join("")}</div>
     <div class="field"><label for="brandCustom">Custom colour</label><div class="row"><input type="color" id="brandCustom" value="${t.brand}" style="width:52px;height:36px;padding:2px;border:1px solid var(--line);border-radius:8px;background:var(--surface)"><code>${t.brand}</code></div></div>
     <div class="alert ${ok?"ok":"warn"}"><b>Contrast ${c.toFixed(1)}:1</b><span>${ok?"White text on this colour meets the WCAG AA standard.":"Below 4.5:1 for white text. Buttons switch to dark text automatically, or choose a deeper shade."}</span></div></section>
+  <section class="card grid"><h2>Company name</h2>
+    <div class="field"><label>Full legal name</label><input type="text" value="${esc(t.name)}" readonly></div>
+    <div class="field"><label for="labelIn">Short label (${(S.labelDraft??t.label).length}/24)</label><div class="row"><input type="text" id="labelIn" maxlength="24" value="${esc(S.labelDraft??t.label)}" style="flex:1;min-width:160px"><button class="btn" data-act="saveLabel" ${labelError(S.labelDraft??t.label)?"disabled":""}>Save label</button></div></div>
+    ${labelError(S.labelDraft??t.label)?`<div class="alert bad"><b>Can't save</b><span>${labelError(S.labelDraft??t.label)}</span></div>`:`<p class="small muted">Used in the company selector, emails, reminders, calendar names and in-app messages. Reports, exports and the audit log keep the full legal name.</p>`}</section>
+  <section class="card grid"><h2>Notification preview</h2>
+    <div class="note"><b>Subject:</b> ${esc(S.labelDraft??t.label)}: Maya Chen requested Vacation, 16 Nov to 18 Nov 2026<br><b>From:</b> ${esc(S.labelDraft??t.label)} Time Off &lt;no-reply@${esc(t.domain)}&gt;</div>
+    <div class="note"><b>Calendar event:</b> ${esc(S.labelDraft??t.label)}: Maya Chen, Out of office</div></section>
   <section class="card grid"><h2>Preview</h2><div class="row"><button class="btn primary">Request time off</button><span class="pill info">Pending</span><a href="#" onclick="return false">Calendar sync</a></div><div class="note">Light and dark mode both use this colour. Hover, borders and tints are derived from it.</div></section>
   </div>`;
 }
@@ -731,10 +741,10 @@ function viewAudit(){
   <section class="card"><div class="tablewrap"><table><thead><tr><th>When</th><th>Who</th><th>What</th></tr></thead><tbody>${t.audit.map(a=>`<tr><td>${esc(a.at)}</td><td>${esc(a.who)}</td><td style="white-space:normal">${esc(a.what)}</td></tr>`).join("")}</tbody></table></div></section>`;
 }
 function viewTenants(){
-  const all=[...TENANTS.map(t=>({name:t.name,country:t.country,seats:t.people.length,domain:t.domain,status:"Live sample",id:t.id,pend:t.requests.filter(r=>r.status.includes("pending")).length,brand:t.brand,short:t.short,logo:t.logo})),...OTHER_TENANTS];
+  const all=[...TENANTS.map(t=>({name:t.name,label:t.label,country:t.country,seats:t.people.length,domain:t.domain,status:"Live sample",id:t.id,pend:t.requests.filter(r=>r.status.includes("pending")).length,brand:t.brand,short:t.short,logo:t.logo})),...OTHER_TENANTS];
   return `<div class="pagehead"><div><h1>Companies</h1><p>Each company's data is kept separate. Open one company at a time; every visit is recorded in that company's audit log.</p></div><button class="btn" data-act="toast" data-v="Prototype: adding a company sets up its domain, branding and first admin. Built in v1.">Add company</button></div>
   <div class="tiles"><div class="tile"><b>${all.length}</b><span>Companies</span></div><div class="tile"><b>${all.reduce((a,x)=>a+x.seats,0)}</b><span>Employees in total</span></div><div class="tile"><b>${TENANTS.reduce((a,t)=>a+t.requests.filter(r=>r.status.includes("pending")).length,0)}</b><span>Requests awaiting approval</span></div><div class="tile"><b>Canada</b><span>Data hosting region</span></div></div>
-  <section class="card"><div class="tablewrap"><table><thead><tr><th>Company</th><th>Country</th><th class="num">Employees</th><th>Sign-in address</th><th>Status</th><th></th></tr></thead><tbody>${all.map(x=>`<tr><td><span class="row"><span class="logo" style="width:26px;height:26px;font-size:.7rem;${x.brand?`background:${x.brand}`:"background:var(--muted)"}">${x.logo?`<img src="${x.logo}" alt="">`:esc(x.short||initials(x.name))}</span>${esc(x.name)}</span></td><td>${esc(x.country)}</td><td class="num">${x.seats}</td><td><code>${esc(x.domain)}</code></td><td><span class="pill ${x.id?"ok":"mute"}">${esc(x.status)}</span></td><td>${x.id?`<button class="btn sm" data-act="enter" data-v="${x.id}">Open company</button>`:'<span class="small muted">Not in mock-up</span>'}</td></tr>`).join("")}</tbody></table></div></section>
+  <section class="card"><div class="tablewrap"><table><thead><tr><th>Short label</th><th>Full name</th><th>Country</th><th class="num">Employees</th><th>Sign-in address</th><th>Status</th><th></th></tr></thead><tbody>${all.map(x=>`<tr><td><span class="row"><span class="logo" style="width:26px;height:26px;font-size:.7rem;${x.brand?`background:${x.brand}`:"background:var(--muted)"}">${x.logo?`<img src="${x.logo}" alt="">`:esc(x.short||initials(x.name))}</span>${esc(x.label)}</span></td><td>${esc(x.name)}</td><td>${esc(x.country)}</td><td class="num">${x.seats}</td><td><code>${esc(x.domain)}</code></td><td><span class="pill ${x.id?"ok":"mute"}">${esc(x.status)}</span></td><td>${x.id?`<button class="btn sm" data-act="enter" data-v="${x.id}">Open company</button>`:'<span class="small muted">Not in mock-up</span>'}</td></tr>`).join("")}</tbody></table></div></section>
   <p class="note">There is no screen that lists employees across companies. Company totals above are counts only.</p>`;
 }
 
@@ -810,6 +820,7 @@ function render(){
   renderModal();
 }
 let toastTimer;
+function notify(msg){ toast(`${T().label}: ${msg}`); }
 function toast(msg){ let el=document.querySelector(".toast"); if(!el){el=document.createElement("div");el.className="toast";el.setAttribute("role","status");document.body.appendChild(el);} el.textContent=msg; clearTimeout(toastTimer); toastTimer=setTimeout(()=>el.remove(),3200); }
 
 /* ---------- actions ---------- */
@@ -829,14 +840,14 @@ function submitReq(){
     if (r.status==="approved" && !m.onBehalf){
       r.change={plan:f.plan,start:f.start,end:f.end,halfStart:f.halfStart,halfEnd:f.halfEnd,days,comment:f.comment};
       r.status="change-pending"; r.steps=buildSteps(t,{pid:r.pid,plan:f.plan,days,start:f.start,end:f.end,id:"chg",replaces:r.id});
-      if (!r.steps.length){ Object.assign(r,r.change); delete r.change; r.status="approved"; toast("Change applied. This plan approves automatically."); }
-      else toast(`Change sent to ${P(r.steps[0].pid).name}. Your original dates stay booked until it's approved.`);
+      if (!r.steps.length){ Object.assign(r,r.change); delete r.change; r.status="approved"; notify("Change applied. This plan approves automatically."); }
+      else notify(`Change sent to ${P(r.steps[0].pid).name}. Your original dates stay booked until it's approved.`);
       log(`${person.name}: changed ${pl.name} ${range(f.start,f.end)} (was ${range(r.start,r.end)}).`);
     } else {
       Object.assign(r,{plan:f.plan,start:f.start,end:f.end,halfStart:f.halfStart,halfEnd:f.halfEnd,days,comment:f.comment});
       if (m.onBehalf){ r.status="approved"; r.steps.forEach(s=>s.status="approved"); log(`Amended ${person.name}'s ${pl.name} to ${range(f.start,f.end)}. Reason: ${f.reason}`); }
       else { r.steps=buildSteps(t,r); if(!r.steps.length) r.status="approved"; log(`${person.name}: edited pending request ${range(f.start,f.end)}.`); }
-      toast("Request updated.");
+      notify("Request updated.");
     }
   } else {
     const r={id:nid("r"),pid:person.id,plan:f.plan,start:f.start,end:f.end,halfStart:f.halfStart,halfEnd:f.halfEnd,days,comment:f.comment,status:"pending",kind:"new",created:TODAY};
@@ -845,7 +856,7 @@ function submitReq(){
     t.requests.push(r);
     if (m.onBehalf) log(`Added ${pl.name} for ${person.name}, ${range(f.start,f.end)}. Reason: ${f.reason}`);
     else log(`${person.name}: requested ${pl.name}, ${range(f.start,f.end)}.`);
-    toast(r.status==="approved" ? `${pl.name} booked: ${range(f.start,f.end)}.` : `Request sent to ${P(r.steps[0].pid).name}. Switch to ${r.steps[0].who==="admin"?"HR admin":"Manager"} view to approve it.`);
+    notify(r.status==="approved" ? `${pl.name} booked: ${range(f.start,f.end)}.` : `Request sent to ${P(r.steps[0].pid).name}. Switch to ${r.steps[0].who==="admin"?"HR admin":"Manager"} view to approve it.`);
   }
   closeModal(); render();
 }
@@ -855,19 +866,19 @@ function decide(id, d){
   const pe=P(r.pid), pl=PL(r.plan), actor=S.platformVisit?"Platform owner":me().name;
   const i=r.steps.findIndex(s=>s.status==="pending");
   if (d==="deny"){
-    if (r.status==="change-pending"){ delete r.change; r.status="approved"; r.steps.forEach(s=>s.status="approved"); toast("Change declined. The original dates stay booked."); }
-    else if (r.status==="cancel-pending"){ r.status="approved"; r.steps.forEach(s=>s.status="approved"); toast("Cancellation declined."); }
-    else { r.status="denied"; toast(`Declined. ${pe.name} is notified with your comment.`); }
+    if (r.status==="change-pending"){ delete r.change; r.status="approved"; r.steps.forEach(s=>s.status="approved"); notify("Change declined. The original dates stay booked."); }
+    else if (r.status==="cancel-pending"){ r.status="approved"; r.steps.forEach(s=>s.status="approved"); notify("Cancellation declined."); }
+    else { r.status="denied"; notify(`Declined. ${pe.name} is notified with your comment.`); }
     r.comment = r.comment ? `${r.comment} · Approver: ${cm}` : `Approver: ${cm}`;
     log(`${actor} declined ${pe.name}'s ${pl.name} (${range(r.start,r.end)}). Comment: ${cm}`);
   } else {
     r.steps[i].status="approved";
-    if (r.steps[i+1]){ r.steps[i+1].status="pending"; toast(`Approved. ${P(r.steps[i+1].pid).name} is notified for the second approval.`); log(`${actor} approved step ${i+1} for ${pe.name}'s ${pl.name}.`); }
+    if (r.steps[i+1]){ r.steps[i+1].status="pending"; notify(`Approved. ${P(r.steps[i+1].pid).name} is notified for the second approval.`); log(`${actor} approved step ${i+1} for ${pe.name}'s ${pl.name}.`); }
     else {
       if (r.status==="change-pending"){ Object.assign(r,r.change); delete r.change; r.status="approved"; }
       else if (r.status==="cancel-pending"){ r.status="cancelled"; }
       else r.status="approved";
-      toast(`Done. ${pe.name}'s calendar feed and balance are updated.`);
+      notify(`Done. ${pe.name}'s calendar feed and balance are updated.`);
       log(`${actor} approved ${pe.name}'s ${pl.name} (${range(r.start,r.end)}).`);
     }
   }
@@ -875,9 +886,9 @@ function decide(id, d){
 }
 function cancelReq(id){
   const t=T(), r=t.requests.find(x=>x.id===id), pl=PL(r.plan), p=P(r.pid);
-  if (r.status==="pending" || S.role==="admin"){ r.status="cancelled"; log(`${S.role==="admin"?"HR cancelled":"Cancelled"} ${p.name}'s ${pl.name} ${range(r.start,r.end)}.`); toast("Cancelled. The days are back in the balance."); }
-  else if (pl.cancelApproval){ r.status="cancel-pending"; r.steps=buildSteps(t,r); if(!r.steps.length){r.status="cancelled";} else toast(`Cancellation sent to ${P(r.steps[0].pid).name} for approval.`); log(`${p.name} asked to cancel ${pl.name} ${range(r.start,r.end)}.`); }
-  else { r.status="cancelled"; toast("Cancelled."); }
+  if (r.status==="pending" || S.role==="admin"){ r.status="cancelled"; log(`${S.role==="admin"?"HR cancelled":"Cancelled"} ${p.name}'s ${pl.name} ${range(r.start,r.end)}.`); notify("Cancelled. The days are back in the balance."); }
+  else if (pl.cancelApproval){ r.status="cancel-pending"; r.steps=buildSteps(t,r); if(!r.steps.length){r.status="cancelled";} else notify(`Cancellation sent to ${P(r.steps[0].pid).name} for approval.`); log(`${p.name} asked to cancel ${pl.name} ${range(r.start,r.end)}.`); }
+  else { r.status="cancelled"; notify("Cancelled."); }
   render();
 }
 
@@ -893,7 +904,7 @@ document.addEventListener("click", e => {
       else { S.role=v; S.view={employee:"home",manager:"team",admin:"people"}[v]; }
       S.report=null; break;
     case "tenant": S.tenant=v; S.selPerson=null; S.selPlan=null; S.report=null; S.filters={}; break;
-    case "view": S.view=v; S.report=null; break;
+    case "view": S.view=v; S.report=null; S.labelDraft=null; break;
     case "enter": S.tenant=v; S.role="admin"; S.platformVisit=true; S.view="people"; S.selPerson=null; S.selPlan=null; log("Platform owner opened the company console."); break;
     case "exitVisit": S.platformVisit=false; S.role="platform"; S.view="tenants"; break;
     case "newReq": newReqModal(el.dataset.for||me().id, !!el.dataset.for); return;
@@ -914,6 +925,7 @@ document.addEventListener("click", e => {
     case "openReport": S.report=v||null; S.filters={...S.filters,rQ:"",rLoc:"",rPlan:""}; if(v) log(`Opened report: ${REPORTS.find(r=>r.id===v).name}.`); break;
     case "sort": { const cur=S.sort[el.dataset.rep]; S.sort[el.dataset.rep]={k:v,dir:cur&&cur.k===v?-cur.dir:1}; break; }
     case "brand": T().brand=v; log(`Brand colour changed to ${v}.`); break;
+    case "saveLabel": { const v=(S.labelDraft??T().label).trim(); if (labelError(v)) return; const old=T().label; T().label=v; S.labelDraft=null; log(`Short label changed from "${old}" to "${v}".`); notify("Short label saved."); break; }
     case "clearLogo": T().logo=null; log("Logo removed."); break;
     default: return;
   }
@@ -933,6 +945,7 @@ document.addEventListener("input", e => {
     const f=S.modal.form; const map={aPlan:"plan",aAmt:"amount",aDate:"date",aReason:"reason"};
     if (map[id]){ f[map[id]]=el.value; renderModal(); return; }
   }
+  if (id==="labelIn"){ S.labelDraft=el.value; render(); return; }
   if (id==="peopleQ"){ S.filters.peopleQ=el.value; render(); return; }
   if (["rQ","rLoc","rPlan","whoFrom","whoTo"].includes(id)){ S.filters[id]=el.value; render(); return; }
   if (el.dataset.act==="levelDays"){ const pl=PL(el.dataset.plan); const l=pl.levels.find(x=>x.id===el.dataset.v); l.days=Number(el.value)||0; render(); return; }
@@ -940,6 +953,7 @@ document.addEventListener("input", e => {
   if (el.dataset.act==="esc"){ PL(el.dataset.plan).escalate=el.value||null; log(`Second approval for ${PL(el.dataset.plan).name} set to ${el.value||"off"}.`); render(); return; }
 });
 document.addEventListener("change", e => {
+  if (e.target.id==="tenantSel"){ S.tenant=e.target.value; S.selPerson=null; S.selPlan=null; S.report=null; S.filters={}; render(); return; }
   if (e.target.id==="logoFile"){ const file=e.target.files[0]; if(!file) return; if (file.size>1.5e6){ toast("Choose an image under 1.5 MB."); return; } const rd=new FileReader(); rd.onload=()=>{ T().logo=rd.result; log("Logo updated."); render(); toast("Logo updated."); }; rd.readAsDataURL(file); }
   if (e.target.id==="brandCustom"){ T().brand=e.target.value; log(`Brand colour changed to ${e.target.value}.`); render(); }
 });
