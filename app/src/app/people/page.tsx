@@ -18,7 +18,7 @@ export default async function PeoplePage({ searchParams }: { searchParams: Promi
       <main className="wrap">
         <div className="pagehead">
           <div><h1>People</h1><p className="muted">{people.length} {status === "all" ? "" : status} {people.length === 1 ? "person" : "people"}{q ? ` matching "${q}"` : ""}</p></div>
-          <Link className="btn" href="/people/new">Add person</Link>
+          <div className="row"><Link className="btn secondary" href="/people/import">Import</Link><Link className="btn" href="/people/new">Add person</Link></div>
         </div>
         <form className="row" role="search" method="get">
           <input name="q" defaultValue={q} placeholder="Search name, email, team, location or manager" aria-label="Search people" style={{ maxWidth: 360 }} />

@@ -38,6 +38,7 @@ Next.js (TypeScript) on PostgreSQL 16. See `../docs/PLAN.md` for requirements an
 - Rules: managers must be active and in the same company; no one manages themselves and no management loops; at least one active HR admin stays; deactivating signs the person out everywhere. Every change is audit-logged with what changed.
 - `/settings`: company time zone and the second-approval threshold (default 10 working days in a row).
 - Employees and managers get a 404 on these pages.
+- `/people/import`: bulk import from CSV or XLSX (2 MB, 1,000 rows). Download the template, upload, review a preview with row-level problems, then confirm. Matched by email; on update only the columns in the file change (a blank cell clears). Everything is applied in one transaction, re-checked at confirm time, and audit-logged. Nothing saves while any row has a problem.
 
 ## Not yet
 Google and Microsoft 365 sign-in is the next branch. Production email (Amazon SES in Canada) comes with the release item.

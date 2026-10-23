@@ -58,3 +58,7 @@ code { background: var(--surface-2); padding: 2px 6px; border-radius: 5px; }
 fieldset { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin: 0; }
 legend { font-size: .8rem; font-weight: 600; color: var(--muted); padding: 0 4px; }
 td a { color: var(--ink); font-weight: 600; }
+.pill.bad { background: var(--bad-bg); color: var(--bad); }
+ul.tight { margin: 0; padding-left: 1.1em; }
+ul.tight.err li { color: var(--bad); }
+input[type=file] { padding: 6px; }
