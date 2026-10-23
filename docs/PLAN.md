@@ -315,5 +315,8 @@ Declined:
 - N6: US staff are salaried and not overtime-eligible. Hourly and overtime eligibility are in the backlog.
 - N7: jurisdiction overrides apply automatically at year end.
 
-## 14. Backlog and roadmap
+## 14. PRD and TRD
+The full scope is now in `docs/PRD.md` (product requirements) and `docs/TRD.md` (technical requirements), with Word and PDF copies in `docs/files/`. They supersede this plan where they differ.
+
+## 15. Backlog and roadmap
 The roadmap and backlog now live on a separate tracking board, where items can be added, reprioritised and promoted between stages: https://claude.ai/artifact/YE4qrkARfucrRoSDgnRD1e. Sections 11 and 12 above are a snapshot as of Draft 5; the board is the source of truth from here on.
