@@ -9,7 +9,7 @@
 
 ## Process
 - Follow `docs/BRANCHING.md`: one branch per roadmap item, pull request with the template, CI green, owner merges.
-- After each merged feature, update `docs/PRD.md` and `docs/TRD.md` (status, decisions, change log) and rebuild `docs/files`.
+- Update `docs/PRD.md` and `docs/TRD.md` (status, decisions, change log) and rebuild `docs/files` only when the owner asks, with the phrase "update trd prd docs" (or close variants such as "update trd pad docs"). The update then covers everything merged since the last document version. Owner's instruction, 23 Oct 2026; replaces updating after every merge.
 - Never commit secrets or real employee data. Development uses synthetic data only.
 
 ## App
