@@ -216,8 +216,8 @@ async function writeDays(tx: Tx, tenantId: string, requestId: string, days: DayP
 async function writeSteps(tx: Tx, tenantId: string, requestId: string, steps: StepPlan[]) {
   await tx`delete from approval_steps where request_id = ${requestId}`;
   for (const [i, st] of steps.entries()) {
-    await tx`insert into approval_steps (tenant_id, request_id, step_no, role, approver_id, status)
-             values (${tenantId}, ${requestId}, ${i + 1}, ${st.role}, ${st.approverId}, ${i === 0 ? "pending" : "waiting"})`;
+    await tx`insert into approval_steps (tenant_id, request_id, step_no, role, approver_id, status, pending_since)
+             values (${tenantId}, ${requestId}, ${i + 1}, ${st.role}, ${st.approverId}, ${i === 0 ? "pending" : "waiting"}, ${i === 0 ? tx`now()` : null})`;
   }
 }
 
@@ -260,11 +260,21 @@ const fmtDates = (s: ISODate, e: ISODate) => (s === e ? s : `${s} to ${e}`);
 async function adminEmails(tx: Tx, except: string) {
   return (await tx`select email from people where role = 'admin' and status = 'active' and id <> ${except}`).map((r) => r.email as string);
 }
+/** Active backups for an approver today, excluding the requester (nobody is asked to approve their own time off). */
+async function backupEmails(tx: Tx, approverId: string, on: ISODate, requesterId: string) {
+  return (await tx`select p.email from approval_backups b join people p on p.id = b.backup_id
+                    where b.approver_id = ${approverId} and ${on} between b.start_date and b.end_date and p.status = 'active' and p.id <> ${requesterId}`).map((r) => r.email as string);
+}
+/** Approvers this person is covering for today. */
+async function coveredFor(tx: Tx, personId: string, on: ISODate): Promise<string[]> {
+  return (await tx`select approver_id from approval_backups where backup_id = ${personId} and ${on} between start_date and end_date`).map((r) => r.approver_id as string);
+}
+
 async function notifyStep(tx: Tx, company: Company, out: Outgoing, requestId: string, subjectLead: string) {
   const [st] = await tx`select s.role, a.email, a.id as approver from approval_steps s left join people a on a.id = s.approver_id where s.request_id = ${requestId} and s.status = 'pending'`;
   if (!st) return;
   const [r] = await tx`select r.start_date, r.end_date, r.days, r.person_id, p.full_name, pl.name as plan_name from requests r join people p on p.id = r.person_id join plans pl on pl.id = r.plan_id where r.id = ${requestId}`;
-  const to = st.email ? [st.email as string] : await adminEmails(tx, r.person_id);
+  const to = st.email ? [st.email as string, ...(await backupEmails(tx, st.approver, todayIn(company.timeZone), r.person_id))] : await adminEmails(tx, r.person_id);
   const link = company.baseUrl ? `\n\nReview it: ${company.baseUrl}/approvals` : "";
   for (const email of to) out.push({ to: email, subject: `${company.label}: ${subjectLead} from ${r.full_name}`, text: `${r.full_name} asked for ${r.plan_name}, ${fmtDates(d(r.start_date), d(r.end_date))} (${Number(r.days)} days).${link}` });
 }
@@ -458,7 +468,8 @@ export async function decideRequest(company: Company, actor: Actor, requestId: s
     if (r.person_id === actor.personId) throw new NotAllowed("You can't decide your own request");
     const [st] = await tx`select id, step_no, role, approver_id from approval_steps where request_id = ${requestId} and status = 'pending'`;
     if (!st) return { ok: false, errors: { form: "This request has no open approval." } };
-    const mine = st.approver_id === actor.personId || (st.role === "admin" && actor.role === "admin");
+    const covering = await coveredFor(tx, actor.personId, todayIn(company.timeZone));
+    const mine = st.approver_id === actor.personId || (st.approver_id && covering.includes(st.approver_id)) || (st.role === "admin" && actor.role === "admin");
     if (!mine && actor.role !== "admin") throw new NotAllowed("Not your approval");
     const override = !mine;
     const text = comment?.trim() || null;
@@ -474,7 +485,7 @@ export async function decideRequest(company: Company, actor: Actor, requestId: s
     } else {
       const [next] = await tx`select id from approval_steps where request_id = ${requestId} and status = 'waiting' order by step_no limit 1`;
       if (next) {
-        await tx`update approval_steps set status = 'pending' where id = ${next.id}`;
+        await tx`update approval_steps set status = 'pending', pending_since = now() where id = ${next.id}`;
         await notifyStep(tx, company, out, requestId, "Second approval needed");
         status = "pending";
       } else {
@@ -596,7 +607,7 @@ export async function listPersonRequests(company: Company, actor: Actor, personI
   return withTenant(company.tenantId, (tx) => rows(tx, company, actor, tx`r.person_id = ${personId}`));
 }
 
-export type ApprovalRow = RequestRow & { mine: boolean; stepRole: string; run: number; longRun: boolean };
+export type ApprovalRow = RequestRow & { mine: boolean; stepRole: string; run: number; longRun: boolean; coveringFor: string | null };
 
 /**
  * Open approvals for the signed-in person: steps waiting on them, plus (for HR admins) every
@@ -604,10 +615,11 @@ export type ApprovalRow = RequestRow & { mine: boolean; stepRole: string; run: n
  */
 export async function listApprovals(company: Company, actor: Actor): Promise<ApprovalRow[]> {
   return withTenant(company.tenantId, async (tx) => {
+    const covering = await coveredFor(tx, actor.personId, todayIn(company.timeZone));
     const open = await tx`
       select s.request_id, s.role, s.approver_id from approval_steps s join requests r on r.id = s.request_id
        where s.status = 'pending' and r.status = 'pending' and r.person_id <> ${actor.personId}
-         and (s.approver_id = ${actor.personId} or ${actor.role === "admin"})`;
+         and (s.approver_id = ${actor.personId} or s.approver_id = any(${covering}::uuid[]) or ${actor.role === "admin"})`;
     if (open.length === 0) return [];
     const list = await rows(tx, company, actor, tx`r.id = any(${open.map((o) => o.request_id)}::uuid[])`);
     const limit = await threshold(tx);
@@ -617,7 +629,7 @@ export async function listApprovals(company: Company, actor: Actor): Promise<App
       const who = (await person(tx, r.personId))!;
       const mineDays = (await tx`select day from request_days where request_id = ${r.id}`).map((x) => d(x.day));
       const others = (await liveDays(tx, r.personId, [r.id, ...(r.targetId ? [r.targetId] : [])])).map((x) => x.day);
-      out.push({ ...r, mine: o.approver_id === actor.personId || (o.role === "admin" && actor.role === "admin"), stepRole: o.role, ...(() => { const run = runLength(scheduleFor(who), mineDays, others); return { run, longRun: run > limit }; })() });
+      out.push({ ...r, mine: o.approver_id === actor.personId || covering.includes(o.approver_id) || (o.role === "admin" && actor.role === "admin"), coveringFor: covering.includes(o.approver_id) ? o.approver_id : null, stepRole: o.role, ...(() => { const run = runLength(scheduleFor(who), mineDays, others); return { run, longRun: run > limit }; })() });
     }
     return out.sort((a, b) => a.startDate.localeCompare(b.startDate));
   });
@@ -626,10 +638,11 @@ export async function listApprovals(company: Company, actor: Actor): Promise<App
 /** How many approvals wait on this person (for the header badge). */
 export async function approvalCount(company: Company, actor: Actor): Promise<number> {
   return withTenant(company.tenantId, async (tx) => {
+    const covering = await coveredFor(tx, actor.personId, todayIn(company.timeZone));
     const [{ n }] = await tx`
       select count(*)::int as n from approval_steps s join requests r on r.id = s.request_id
        where s.status = 'pending' and r.status = 'pending' and r.person_id <> ${actor.personId}
-         and (s.approver_id = ${actor.personId} or (s.role = 'admin' and ${actor.role === "admin"}))`;
+         and (s.approver_id = ${actor.personId} or s.approver_id = any(${covering}::uuid[]) or (s.role = 'admin' and ${actor.role === "admin"}))`;
     return n;
   });
 }

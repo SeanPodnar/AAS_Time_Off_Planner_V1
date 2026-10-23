@@ -18,7 +18,8 @@
     "db:migrate": "tsx scripts/migrate.ts",
     "db:seed": "tsx scripts/seed.ts",
     "platform:add-owner": "tsx scripts/add-platform-owner.ts",
-    "accrual:nightly": "tsx scripts/nightly.ts"
+    "accrual:nightly": "tsx scripts/nightly.ts",
+    "jobs": "tsx scripts/nightly.ts"
   },
   "dependencies": {
     "next": "15.5.28",
