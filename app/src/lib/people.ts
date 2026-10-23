@@ -217,19 +217,23 @@ export async function setStatus(tenantId: string, actor: Actor, id: string, stat
 
 // Company settings ---------------------------------------------------------------------
 
-export type Settings = { timeZone: string; secondApprovalThreshold: number };
+export type Settings = { timeZone: string; secondApprovalThreshold: number; reminderAfterDays: number; escalateAfterDays: number };
 
 export async function getSettings(tenantId: string, country: "CA" | "US"): Promise<Settings> {
   return withTenant(tenantId, async (tx) => {
-    const [s] = await tx`select time_zone, second_approval_threshold from tenant_settings`;
-    return s ? { timeZone: s.time_zone, secondApprovalThreshold: s.second_approval_threshold } : { timeZone: DEFAULT_TIME_ZONE[country], secondApprovalThreshold: 10 };
+    const [s] = await tx`select time_zone, second_approval_threshold, reminder_after_days, escalate_after_days from tenant_settings`;
+    return s
+      ? { timeZone: s.time_zone, secondApprovalThreshold: s.second_approval_threshold, reminderAfterDays: Number(s.reminder_after_days), escalateAfterDays: Number(s.escalate_after_days) }
+      : { timeZone: DEFAULT_TIME_ZONE[country], secondApprovalThreshold: 10, reminderAfterDays: 2, escalateAfterDays: 5 };
   });
 }
 
 export const settingsInput = z.object({
   timeZone: z.string().refine(isTimeZone, "Choose a time zone from the list."),
   secondApprovalThreshold: z.coerce.number().int("Use a whole number of days.").min(1, "Use 1 to 60 days.").max(60, "Use 1 to 60 days."),
-});
+  reminderAfterDays: z.coerce.number({ message: "Use a whole number of days." }).int("Use a whole number of days.").min(1, "Use 1 to 30 days.").max(30, "Use 1 to 30 days."),
+  escalateAfterDays: z.coerce.number({ message: "Use a whole number of days." }).int("Use a whole number of days.").min(1, "Use 1 to 60 days.").max(60, "Use 1 to 60 days."),
+}).refine((v) => v.escalateAfterDays > v.reminderAfterDays, { path: ["escalateAfterDays"], message: "Escalate after more days than the reminder." });
 
 export async function saveSettings(tenantId: string, actor: Actor, raw: unknown): Promise<{ ok: true } | { ok: false; errors: Record<string, string> }> {
   assertAdmin(actor);
@@ -237,9 +241,23 @@ export async function saveSettings(tenantId: string, actor: Actor, raw: unknown)
   if (!parsed.success) return { ok: false, errors: fieldErrors(parsed.error) };
   const s = parsed.data;
   await withTenant(tenantId, async (tx) => {
-    await tx`insert into tenant_settings (tenant_id, time_zone, second_approval_threshold) values (app_tenant_id(), ${s.timeZone}, ${s.secondApprovalThreshold})
-             on conflict (tenant_id) do update set time_zone = excluded.time_zone, second_approval_threshold = excluded.second_approval_threshold, updated_at = now()`;
+    await tx`insert into tenant_settings (tenant_id, time_zone, second_approval_threshold, reminder_after_days, escalate_after_days)
+             values (app_tenant_id(), ${s.timeZone}, ${s.secondApprovalThreshold}, ${s.reminderAfterDays}, ${s.escalateAfterDays})
+             on conflict (tenant_id) do update set time_zone = excluded.time_zone, second_approval_threshold = excluded.second_approval_threshold,
+               reminder_after_days = excluded.reminder_after_days, escalate_after_days = excluded.escalate_after_days, updated_at = now()`;
     await writeAudit(tx, `person:${actor.personId}`, "settings.updated", s);
   });
   return { ok: true };
+}
+
+/** Active people in the company, for pickers such as choosing a backup approver. */
+export async function listActivePeopleNames(tenantId: string): Promise<{ id: string; fullName: string }[]> {
+  return withTenant(tenantId, async (tx) =>
+    (await tx`select id, full_name from people where status = 'active' order by lower(full_name), id`).map((r) => ({ id: r.id as string, fullName: r.full_name as string })));
+}
+
+/** Distinct jurisdictions of active people with head counts, most common first. */
+export async function peopleJurisdictions(tenantId: string): Promise<{ jurisdiction: string; count: number }[]> {
+  const rows = await withTenant(tenantId, (tx) => tx`select jurisdiction, count(*)::int as n from people where status = 'active' group by jurisdiction order by n desc, jurisdiction`);
+  return rows.map((r) => ({ jurisdiction: r.jurisdiction as string, count: Number(r.n) }));
 }

@@ -41,7 +41,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ r
   const sp = await searchParams;
   const company = await companyFor(site);
   const actor = { personId: user.personId, role: user.role };
-  const [mine, approvals] = await Promise.all([listMyRequests(company, actor), approvalsBadge(company, actor, user)]);
+  const [mine, approvals] = await Promise.all([listMyRequests(company, actor), approvalsBadge(company, actor)]);
   const showAll = sp.all === "1";
   const rows = showAll ? mine : mine.filter((r) => r.status !== "superseded");
   const hasPast = mine.some((r) => r.status === "superseded");

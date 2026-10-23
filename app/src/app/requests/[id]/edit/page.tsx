@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 export default async function EditRequestPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const { site, user, company, actor } = await requestContext();
-  const [mine, plans, approvals] = await Promise.all([listMyRequests(company, actor), requestablePlans(company, actor), approvalsBadge(company, actor, user)]);
+  const [mine, plans, approvals] = await Promise.all([listMyRequests(company, actor), requestablePlans(company, actor), approvalsBadge(company, actor)]);
   const r = mine.find((x) => x.id === id);
   if (!r || !r.canAmend) notFound();
   const single = r.startDate === r.endDate;

@@ -13,6 +13,7 @@ import { NotAllowed, type Actor } from "../people";
 import { addDays, todayIn, type ISODate } from "../accrual/dates";
 import { loadContext, loadRules, postAccruals, type Context } from "../accrual/post";
 import { computeDueRows, planYearStart } from "../accrual/schedule";
+import { holidayDates } from "../holidays";
 import { partsClash, partValue, requestDays, runLength, totalDays, type DayPart, type Part, type Schedule } from "./days";
 
 export { NotAllowed };
@@ -43,10 +44,10 @@ export type Result<T = object> = ({ ok: true } & T) | { ok: false; errors: Error
 
 // Loading ---------------------------------------------------------------------------------
 
-type PersonRow = { id: string; fullName: string; email: string; managerId: string | null; teamId: string | null; hireDate: ISODate; workDays: number[]; hoursPerDay: number; status: string };
+type PersonRow = { id: string; fullName: string; email: string; managerId: string | null; teamId: string | null; hireDate: ISODate; workDays: number[]; hoursPerDay: number; status: string; jurisdiction: string };
 async function person(tx: Tx, id: string): Promise<PersonRow | null> {
-  const [p] = await tx`select id, full_name, email, manager_id, team_id, hire_date, work_days, hours_per_day, status from people where id = ${id}`;
-  return p ? { id: p.id, fullName: p.full_name, email: p.email, managerId: p.manager_id, teamId: p.team_id, hireDate: d(p.hire_date), workDays: p.work_days.map(Number), hoursPerDay: Number(p.hours_per_day), status: p.status } : null;
+  const [p] = await tx`select id, full_name, email, manager_id, team_id, hire_date, work_days, hours_per_day, status, jurisdiction from people where id = ${id}`;
+  return p ? { id: p.id, fullName: p.full_name, email: p.email, managerId: p.manager_id, teamId: p.team_id, hireDate: d(p.hire_date), workDays: p.work_days.map(Number), hoursPerDay: Number(p.hours_per_day), status: p.status, jurisdiction: p.jurisdiction } : null;
 }
 
 type PlanRow = { id: string; name: string; unit: "days" | "hours"; accrualMethod: string; approvalMode: "auto" | "manager" | "admin"; secondApproval: boolean; negativeLimit: number; waitingPeriodDays: number; counts: "working_days" | "calendar_days"; visibility: string; cancelNeedsApproval: boolean; active: boolean };
@@ -64,8 +65,14 @@ async function threshold(tx: Tx) {
   return s ? Number(s.second_approval_threshold) : 10;
 }
 
-// Holidays arrive with FR-41; until then only the person's work days decide working days.
-const scheduleFor = (p: PersonRow): Schedule => ({ workDays: p.workDays, holidays: new Set() });
+/**
+ * The person's work days and holidays (their jurisdiction's defaults with the company's changes)
+ * around a date range. The window reaches a year either side so the run of joined-up time off
+ * sees holidays that sit between bookings.
+ */
+async function scheduleFor(tx: Tx, p: PersonRow, from: ISODate, to: ISODate): Promise<Schedule> {
+  return { workDays: p.workDays, holidays: await holidayDates(tx, p.jurisdiction, addDays(from, -370), addDays(to, 370)) };
+}
 
 /** Live days a person has booked or requested, excluding the given requests. Cancellation requests add no days. */
 async function liveDays(tx: Tx, personId: string, exclude: string[]) {
@@ -148,8 +155,9 @@ async function draft(tx: Tx, company: Company, actor: Actor, personId: string, r
   const earliest = addDays(who.hireDate, p.waitingPeriodDays);
   if (s < earliest) return { errors: { startDate: `This plan can be used from ${earliest}.` } };
 
-  const days = requestDays(scheduleFor(who), s, e, input.startPart, input.endPart, p.counts);
-  if (days.length === 0) return { errors: { startDate: "Those dates have no working days." } };
+  const schedule = await scheduleFor(tx, who, s, e);
+  const days = requestDays(schedule, s, e, input.startPart, input.endPart, p.counts);
+  if (days.length === 0) return { errors: { startDate: "Those dates have no working days (weekends and holidays are not counted)." } };
 
   const exclude = [opts.replacing, opts.editing].filter(Boolean) as string[];
   const others = await liveDays(tx, personId, exclude);
@@ -170,7 +178,7 @@ async function draft(tx: Tx, company: Company, actor: Actor, personId: string, r
     }
   }
 
-  const run = runLength(scheduleFor(who), days.map((x) => x.day), others.map((o) => o.day));
+  const run = runLength(schedule, days.map((x) => x.day), others.map((o) => o.day));
   const limit = await threshold(tx);
   const secondApproval = p.approvalMode === "manager" && p.secondApproval && run > limit;
   const steps = await planSteps(tx, who, p, secondApproval);
@@ -216,8 +224,8 @@ async function writeDays(tx: Tx, tenantId: string, requestId: string, days: DayP
 async function writeSteps(tx: Tx, tenantId: string, requestId: string, steps: StepPlan[]) {
   await tx`delete from approval_steps where request_id = ${requestId}`;
   for (const [i, st] of steps.entries()) {
-    await tx`insert into approval_steps (tenant_id, request_id, step_no, role, approver_id, status)
-             values (${tenantId}, ${requestId}, ${i + 1}, ${st.role}, ${st.approverId}, ${i === 0 ? "pending" : "waiting"})`;
+    await tx`insert into approval_steps (tenant_id, request_id, step_no, role, approver_id, status, pending_since)
+             values (${tenantId}, ${requestId}, ${i + 1}, ${st.role}, ${st.approverId}, ${i === 0 ? "pending" : "waiting"}, ${i === 0 ? tx`now()` : null})`;
   }
 }
 
@@ -260,11 +268,21 @@ const fmtDates = (s: ISODate, e: ISODate) => (s === e ? s : `${s} to ${e}`);
 async function adminEmails(tx: Tx, except: string) {
   return (await tx`select email from people where role = 'admin' and status = 'active' and id <> ${except}`).map((r) => r.email as string);
 }
+/** Active backups for an approver today, excluding the requester (nobody is asked to approve their own time off). */
+async function backupEmails(tx: Tx, approverId: string, on: ISODate, requesterId: string) {
+  return (await tx`select p.email from approval_backups b join people p on p.id = b.backup_id
+                    where b.approver_id = ${approverId} and ${on} between b.start_date and b.end_date and p.status = 'active' and p.id <> ${requesterId}`).map((r) => r.email as string);
+}
+/** Approvers this person is covering for today. */
+async function coveredFor(tx: Tx, personId: string, on: ISODate): Promise<string[]> {
+  return (await tx`select approver_id from approval_backups where backup_id = ${personId} and ${on} between start_date and end_date`).map((r) => r.approver_id as string);
+}
+
 async function notifyStep(tx: Tx, company: Company, out: Outgoing, requestId: string, subjectLead: string) {
   const [st] = await tx`select s.role, a.email, a.id as approver from approval_steps s left join people a on a.id = s.approver_id where s.request_id = ${requestId} and s.status = 'pending'`;
   if (!st) return;
   const [r] = await tx`select r.start_date, r.end_date, r.days, r.person_id, p.full_name, pl.name as plan_name from requests r join people p on p.id = r.person_id join plans pl on pl.id = r.plan_id where r.id = ${requestId}`;
-  const to = st.email ? [st.email as string] : await adminEmails(tx, r.person_id);
+  const to = st.email ? [st.email as string, ...(await backupEmails(tx, st.approver, todayIn(company.timeZone), r.person_id))] : await adminEmails(tx, r.person_id);
   const link = company.baseUrl ? `\n\nReview it: ${company.baseUrl}/approvals` : "";
   for (const email of to) out.push({ to: email, subject: `${company.label}: ${subjectLead} from ${r.full_name}`, text: `${r.full_name} asked for ${r.plan_name}, ${fmtDates(d(r.start_date), d(r.end_date))} (${Number(r.days)} days).${link}` });
 }
@@ -458,7 +476,8 @@ export async function decideRequest(company: Company, actor: Actor, requestId: s
     if (r.person_id === actor.personId) throw new NotAllowed("You can't decide your own request");
     const [st] = await tx`select id, step_no, role, approver_id from approval_steps where request_id = ${requestId} and status = 'pending'`;
     if (!st) return { ok: false, errors: { form: "This request has no open approval." } };
-    const mine = st.approver_id === actor.personId || (st.role === "admin" && actor.role === "admin");
+    const covering = await coveredFor(tx, actor.personId, todayIn(company.timeZone));
+    const mine = st.approver_id === actor.personId || (st.approver_id && covering.includes(st.approver_id)) || (st.role === "admin" && actor.role === "admin");
     if (!mine && actor.role !== "admin") throw new NotAllowed("Not your approval");
     const override = !mine;
     const text = comment?.trim() || null;
@@ -474,7 +493,7 @@ export async function decideRequest(company: Company, actor: Actor, requestId: s
     } else {
       const [next] = await tx`select id from approval_steps where request_id = ${requestId} and status = 'waiting' order by step_no limit 1`;
       if (next) {
-        await tx`update approval_steps set status = 'pending' where id = ${next.id}`;
+        await tx`update approval_steps set status = 'pending', pending_since = now() where id = ${next.id}`;
         await notifyStep(tx, company, out, requestId, "Second approval needed");
         status = "pending";
       } else {
@@ -565,8 +584,9 @@ async function rows(tx: Tx, company: Company, actor: Actor, where: postgres.Pend
      where ${where} order by r.start_date desc, r.created_at desc limit 200`;
   if (rs.length === 0) return [];
   const steps = await tx`
-    select s.request_id, s.step_no, s.role, s.status, s.comment, s.decided_at, s.override, a.full_name as approver
-      from approval_steps s left join people a on a.id = s.approver_id where s.request_id = any(${rs.map((r) => r.id)}::uuid[]) order by s.step_no`;
+    select s.request_id, s.step_no, s.role, s.status, s.comment, s.decided_at, s.override, a.full_name as approver,
+           s.decided_by, s.approver_id, k.full_name as decider
+      from approval_steps s left join people a on a.id = s.approver_id left join people k on k.id = s.decided_by where s.request_id = any(${rs.map((r) => r.id)}::uuid[]) order by s.step_no`;
   const now = todayIn(company.timeZone);
   return rs.map((r) => {
     const live = r.status === "pending" || r.status === "approved";
@@ -576,7 +596,7 @@ async function rows(tx: Tx, company: Company, actor: Actor, where: postgres.Pend
       id: r.id, personId: r.person_id, personName: r.full_name, planId: r.plan_id, planName: r.plan_name, unit: r.unit,
       kind: r.kind, targetId: r.target_id, startDate: d(r.start_date), endDate: d(r.end_date), startPart: r.start_part, endPart: r.end_part,
       days: Number(r.days), amount: Number(r.amount), status: r.status, comment: r.comment, adminReason: r.admin_reason, createdAt: new Date(r.created_at).toISOString(),
-      steps: steps.filter((s) => s.request_id === r.id).map((s) => ({ stepNo: s.step_no, role: s.role, approverName: s.approver ?? "HR", status: s.status, comment: s.comment, decidedAt: s.decided_at ? new Date(s.decided_at).toISOString() : null, override: s.override })),
+      steps: steps.filter((s) => s.request_id === r.id).map((s) => ({ stepNo: s.step_no, role: s.role, approverName: s.decided_by && s.decided_by !== s.approver_id && s.decider ? `${s.decider}${s.override ? " (HR override)" : s.role === "admin" ? "" : ` for ${s.approver}`}` : s.approver ?? "HR", status: s.status, comment: s.comment, decidedAt: s.decided_at ? new Date(s.decided_at).toISOString() : null, override: s.override })),
       openFollowUp: r.open_follow_up ?? null,
       canAmend: live && r.kind !== "cancel" && !r.open_follow_up && (r.status === "pending" || !started || actor.role === "admin"),
       canCancel: live && !(r.kind === "cancel" && r.status === "approved") && !r.open_follow_up && (r.status === "pending" || !started || actor.role === "admin") && (own || actor.role === "admin"),
@@ -596,7 +616,7 @@ export async function listPersonRequests(company: Company, actor: Actor, personI
   return withTenant(company.tenantId, (tx) => rows(tx, company, actor, tx`r.person_id = ${personId}`));
 }
 
-export type ApprovalRow = RequestRow & { mine: boolean; stepRole: string; run: number; longRun: boolean };
+export type ApprovalRow = RequestRow & { mine: boolean; stepRole: string; run: number; longRun: boolean; coveringFor: string | null };
 
 /**
  * Open approvals for the signed-in person: steps waiting on them, plus (for HR admins) every
@@ -604,10 +624,11 @@ export type ApprovalRow = RequestRow & { mine: boolean; stepRole: string; run: n
  */
 export async function listApprovals(company: Company, actor: Actor): Promise<ApprovalRow[]> {
   return withTenant(company.tenantId, async (tx) => {
+    const covering = await coveredFor(tx, actor.personId, todayIn(company.timeZone));
     const open = await tx`
       select s.request_id, s.role, s.approver_id from approval_steps s join requests r on r.id = s.request_id
        where s.status = 'pending' and r.status = 'pending' and r.person_id <> ${actor.personId}
-         and (s.approver_id = ${actor.personId} or ${actor.role === "admin"})`;
+         and (s.approver_id = ${actor.personId} or s.approver_id = any(${covering}::uuid[]) or ${actor.role === "admin"})`;
     if (open.length === 0) return [];
     const list = await rows(tx, company, actor, tx`r.id = any(${open.map((o) => o.request_id)}::uuid[])`);
     const limit = await threshold(tx);
@@ -617,7 +638,7 @@ export async function listApprovals(company: Company, actor: Actor): Promise<App
       const who = (await person(tx, r.personId))!;
       const mineDays = (await tx`select day from request_days where request_id = ${r.id}`).map((x) => d(x.day));
       const others = (await liveDays(tx, r.personId, [r.id, ...(r.targetId ? [r.targetId] : [])])).map((x) => x.day);
-      out.push({ ...r, mine: o.approver_id === actor.personId || (o.role === "admin" && actor.role === "admin"), stepRole: o.role, ...(() => { const run = runLength(scheduleFor(who), mineDays, others); return { run, longRun: run > limit }; })() });
+      out.push({ ...r, mine: o.approver_id === actor.personId || covering.includes(o.approver_id) || (o.role === "admin" && actor.role === "admin"), coveringFor: covering.includes(o.approver_id) ? o.approver_id : null, stepRole: o.role, ...(await (async () => { const run = runLength(await scheduleFor(tx, who, r.startDate, r.endDate), mineDays, others); return { run, longRun: run > limit }; })()) });
     }
     return out.sort((a, b) => a.startDate.localeCompare(b.startDate));
   });
@@ -626,10 +647,11 @@ export async function listApprovals(company: Company, actor: Actor): Promise<App
 /** How many approvals wait on this person (for the header badge). */
 export async function approvalCount(company: Company, actor: Actor): Promise<number> {
   return withTenant(company.tenantId, async (tx) => {
+    const covering = await coveredFor(tx, actor.personId, todayIn(company.timeZone));
     const [{ n }] = await tx`
       select count(*)::int as n from approval_steps s join requests r on r.id = s.request_id
        where s.status = 'pending' and r.status = 'pending' and r.person_id <> ${actor.personId}
-         and (s.approver_id = ${actor.personId} or (s.role = 'admin' and ${actor.role === "admin"}))`;
+         and (s.approver_id = ${actor.personId} or s.approver_id = any(${covering}::uuid[]) or (s.role = 'admin' and ${actor.role === "admin"}))`;
     return n;
   });
 }
