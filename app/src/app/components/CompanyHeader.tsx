@@ -10,7 +10,7 @@ export function brandStyle(t: TenantBranding) {
 
 export function CompanyHeader({ tenant, user, current }: { tenant: TenantBranding; user: SessionUser; current?: string }) {
   const role = user.role === "admin" ? "HR admin" : user.isManager ? "Manager" : "Employee";
-  const links = [{ href: "/", label: "My time off" }, ...(user.role === "admin" ? [{ href: "/people", label: "People" }, { href: "/settings", label: "Settings" }] : [])];
+  const links = [{ href: "/", label: "My time off" }, ...(user.role === "admin" ? [{ href: "/people", label: "People" }, { href: "/plans", label: "Plans" }, { href: "/settings", label: "Settings" }] : [])];
   return (
     <header className="top">
       <span className="mark" aria-hidden="true">{tenant.shortLabel.slice(0, 2).toUpperCase()}</span>
