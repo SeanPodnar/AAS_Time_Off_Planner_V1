@@ -96,7 +96,7 @@ const STAGES = [
   {id:"declined", name:"Declined", sub:"Decided against"}
 ];
 const LADDER = ["backlog","later","next","now","done"];
-const AREAS = ["Platform","Security","Plans and accrual","Requests and approvals","Calendar","Reports","Integrations","Compliance","Mobile","Admin"];
+const AREAS = ["Platform","Security","Plans and accrual","Requests and approvals","Calendar","Reports","Integrations","Compliance","Mobile","Admin","Help and training"];
 const TABS = [["roadmap","Roadmap"],["backlog","Backlog"],["blocked","Blocked"],["closed","Done and declined"]];
 const S = { items:[], tab:"roadmap", q:"", area:"", ready:false, dbOk:true, readOnly:false, modal:null, confirmDel:null };
 try { S.tab = localStorage.getItem("aas-roadmap-tab") || "roadmap"; } catch(e){}
