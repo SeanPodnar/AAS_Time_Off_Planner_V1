@@ -2,6 +2,7 @@
 import { createTenant } from "../src/lib/tenants";
 import { withTenant } from "../src/lib/tenancy";
 import { closeDb, platformDb } from "../src/lib/db";
+import { assignPlanToAll, savePlan, starterTemplates } from "../src/lib/plans";
 
 const companies = [
   { legalName: "Northwind Analytics Inc.", shortLabel: "Northwind", subdomain: "northwind", customDomain: "", brandColor: "#2f7fd8", country: "CA",
@@ -20,6 +21,15 @@ for (const c of companies) {
                        (select id from people where lower(email) = ${managerEmail ?? ""}))`;
     }
   });
+  // Starter plans, assigned to everyone from 2026-01-01.
+  const admin = await withTenant(res.id, async (tx) => (await tx`select id from people where role = 'admin' limit 1`)[0].id as string);
+  const actor = { personId: admin, role: "admin" as const };
+  for (const t of starterTemplates) {
+    const saved = await savePlan(res.id, actor, t.plan);
+    if (!saved.ok) { console.log(`plan ${t.label}: ${Object.values(saved.errors).join(" ")}`); continue; }
+    const level = await withTenant(res.id, async (tx) => (await tx`select id from plan_levels where plan_id = ${saved.id} order by sort_order limit 1`)[0].id as string);
+    await assignPlanToAll(res.id, actor, { planId: saved.id, levelId: level, effectiveFrom: "2026-01-01" });
+  }
   console.log(`seeded ${c.shortLabel}`);
 }
 await platformDb()`insert into platform_owners (email, full_name) values ('owner@aas.example', 'Sample Platform Owner') on conflict do nothing`;
