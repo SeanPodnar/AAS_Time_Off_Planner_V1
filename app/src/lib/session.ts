@@ -39,18 +39,27 @@ export async function clientInfo() {
   return { ip, userAgent: h.get("user-agent") };
 }
 
-export async function requireCompanyUser(): Promise<{ site: Extract<Site, { kind: "company" }>; user: SessionUser }> {
+/** HR admins must pass a two-factor check before using the app. Employees and managers do not (yet). */
+export const needsMfa = (u: SessionUser) => u.role === "admin";
+
+type Opts = { allowPendingMfa?: boolean };
+
+export async function requireCompanyUser(opts: Opts = {}): Promise<{ site: Extract<Site, { kind: "company" }>; user: SessionUser; token: string }> {
   const site = await currentSite();
   if (site.kind !== "company") redirect("/platform");
-  const user = await sessionUser(site.tenant.id, (await cookies()).get(COMPANY_COOKIE)?.value);
-  if (!user) redirect("/login");
-  return { site, user };
+  const token = (await cookies()).get(COMPANY_COOKIE)?.value;
+  const user = await sessionUser(site.tenant.id, token);
+  if (!user || !token) redirect("/login");
+  if (!opts.allowPendingMfa && needsMfa(user) && !user.mfaVerified) redirect("/mfa");
+  return { site, user, token };
 }
 
-export async function requirePlatformOwner(): Promise<PlatformUser> {
+export async function requirePlatformOwner(opts: Opts = {}): Promise<PlatformUser & { token: string }> {
   const site = await currentSite();
   if (site.kind !== "platform") notFound();
-  const owner = await platformUser((await cookies()).get(PLATFORM_COOKIE)?.value);
-  if (!owner) redirect("/login");
-  return owner;
+  const token = (await cookies()).get(PLATFORM_COOKIE)?.value;
+  const owner = await platformUser(token);
+  if (!owner || !token) redirect("/login");
+  if (!opts.allowPendingMfa && !owner.mfaVerified) redirect("/mfa");
+  return { ...owner, token };
 }
