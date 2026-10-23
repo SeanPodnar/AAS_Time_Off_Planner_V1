@@ -1,6 +1,6 @@
 ---
 title: "AAS Time Off Planner: Technical Requirements Document"
-subtitle: "Version 1.1"
+subtitle: "Version 1.2"
 date: "23 October 2026"
 ---
 
@@ -9,11 +9,11 @@ date: "23 October 2026"
 | Item | Detail |
 |---|---|
 | Document | Technical Requirements Document (TRD) |
-| Version | 1.1 (see change log, section 22) |
+| Version | 1.2 (see change log, section 22) |
 | Date | 23 October 2026 |
 | Companion | Product Requirements Document (PRD) v1.0; requirement IDs FR- and NFR- refer to it |
 | Code | `github.com/SeanPodnar/AAS_Time_Off_Planner_V1`, folder `app/` |
-| Built so far | Migrations 001 to 004: companies, people, audit log, company data separation, email sign-in, sessions, roles, platform owner sign-in, two-step sign-in, people management, company settings. 70 automated tests. |
+| Built so far | Migrations 001 to 005: companies, people, audit log, company data separation, email sign-in, sessions, roles, platform owner sign-in, two-step sign-in, people management, company settings, bulk import of people. 84 automated tests. |
 
 # 2. Architecture
 
@@ -80,7 +80,7 @@ UUID keys everywhere (no shared sequences), no cross-company foreign keys, files
 
 # 5. Data model
 
-## 5.1 Built (migrations 001 to 004)
+## 5.1 Built (migrations 001 to 005)
 
 | Table | Purpose | Key columns |
 |---|---|---|
@@ -89,6 +89,7 @@ UUID keys everywhere (no shared sequences), no cross-company foreign keys, files
 | `tenant_settings` | Company settings | time_zone (IANA), second_approval_threshold (default 10). Defaults apply until first saved. |
 | `teams`, `locations` | Grouping | Name unique per company ignoring case; created by typing a new name |
 | `person_managers` | Secondary managers | See and are notified; only the primary manager approves |
+| `import_batches` | Bulk import staging | Parsed file rows (JSON), created_by (must be an HR admin of the same company), expires after one hour, used once, under row-level security |
 | `audit_log` | Append-only history | tenant_id, at, actor, action, detail (JSON). Update and delete blocked by trigger and grants. |
 | `login_tokens`, `sessions` | Email sign-in | SHA-256 token hashes, expiry, used or revoked time, method, mfa_at |
 | `mfa_factors`, `mfa_recovery_codes` | Two-step sign-in | Encrypted key, confirmed time, last used step; hashed recovery codes |
@@ -99,7 +100,6 @@ UUID keys everywhere (no shared sequences), no cross-company foreign keys, files
 | Table | Purpose |
 |---|---|
 | `tenant_settings` (more columns) | Retention, sign-in methods allowed, allowed email domains |
-| `import_batches` | Parsed bulk-import files awaiting confirmation, expiring after one hour |
 | `plans`, `plan_levels`, `plan_assignments` | Plans, levels with days per year, one level per person per plan, effective dates |
 | `accrual_ledger` | Every credit and debit as a row: grant, accrual, proration, carryover, forfeiture, override, adjustment, booking. Balances are sums, never stored totals, so every number can be explained. |
 | `jurisdiction_rules` | Versioned, dated statutory rules: minimum entitlement by years of service, forfeiture rule, sick leave minimums and caps, by province, state and city |
@@ -225,6 +225,7 @@ Environments: development (from `main`, synthetic data), production (from releas
 - Releases tagged `v1.0.0`, `v1.1.0`; hotfixes `v1.0.x`.
 - GitHub branch protection is configured but not enforced on the free plan for a private repository; GitHub Pro (about US$4 a month) enforces it.
 - The PRD and TRD are updated after each merged feature, in a small documentation pull request, with a change log entry.
+- Model delegation: simpler, low-complexity tasks (documentation, status updates, standard screens) go to lower AI models and are reviewed by the orchestrating session before a pull request; the owner is asked before escalating to a higher model for complex or high-risk work (accrual and statutory logic, approvals, sign-in, data separation). See `CLAUDE.md`.
 
 # 17. Testing strategy
 
@@ -283,3 +284,4 @@ Structured logs without personal data beyond ids; error tracking hosted in Canad
 |---|---|---|
 | 1.0 | 23 Oct 2026 | First full scope. |
 | 1.1 | 23 Oct 2026 | Migration 004 built (company settings, teams, locations, secondary managers, employee number, work days and hours per day). Added section 10.1 on time zones and `requester_time_zone` on requests. T4 and T5 resolved. Documentation updated after each merged feature. |
+| 1.2 | 23 Oct 2026 | Migration 005 (import_batches) built for bulk import of people. Model delegation rule added to the delivery process. |
