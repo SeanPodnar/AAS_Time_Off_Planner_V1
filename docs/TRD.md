@@ -1,6 +1,6 @@
 ---
 title: "AAS Time Off Planner: Technical Requirements Document"
-subtitle: "Version 1.0 draft for review"
+subtitle: "Version 1.1"
 date: "23 October 2026"
 ---
 
@@ -9,11 +9,11 @@ date: "23 October 2026"
 | Item | Detail |
 |---|---|
 | Document | Technical Requirements Document (TRD) |
-| Version | 1.0, draft for review |
+| Version | 1.1 (see change log, section 22) |
 | Date | 23 October 2026 |
 | Companion | Product Requirements Document (PRD) v1.0; requirement IDs FR- and NFR- refer to it |
 | Code | `github.com/SeanPodnar/AAS_Time_Off_Planner_V1`, folder `app/` |
-| Built so far | Migrations 001 to 003: companies, people, audit log, company data separation, email sign-in, sessions, roles, platform owner sign-in, two-step sign-in. 60 automated tests. |
+| Built so far | Migrations 001 to 004: companies, people, audit log, company data separation, email sign-in, sessions, roles, platform owner sign-in, two-step sign-in, people management, company settings. 70 automated tests. |
 
 # 2. Architecture
 
@@ -80,12 +80,15 @@ UUID keys everywhere (no shared sequences), no cross-company foreign keys, files
 
 # 5. Data model
 
-## 5.1 Built (migrations 001 to 003)
+## 5.1 Built (migrations 001 to 004)
 
 | Table | Purpose | Key columns |
 |---|---|---|
 | `tenants` | Companies | legal_name, short_label (unique ignoring case and spaces, 24 max), subdomain, custom_domain, brand_color, country, status |
-| `people` | Employees | tenant_id, full_name, email (unique per company), job_title, jurisdiction (`CA-ON`, `US-CA`), hire_date, manager_id, role, status |
+| `people` | Employees | tenant_id, full_name, email (unique per company), job_title, employee_number (unique per company), jurisdiction (`CA-ON`, `US-CA`), hire_date, manager_id (same company, not self), team_id, location_id, role, status, hours_per_day, work_days (ISO weekdays, part-time) |
+| `tenant_settings` | Company settings | time_zone (IANA), second_approval_threshold (default 10). Defaults apply until first saved. |
+| `teams`, `locations` | Grouping | Name unique per company ignoring case; created by typing a new name |
+| `person_managers` | Secondary managers | See and are notified; only the primary manager approves |
 | `audit_log` | Append-only history | tenant_id, at, actor, action, detail (JSON). Update and delete blocked by trigger and grants. |
 | `login_tokens`, `sessions` | Email sign-in | SHA-256 token hashes, expiry, used or revoked time, method, mfa_at |
 | `mfa_factors`, `mfa_recovery_codes` | Two-step sign-in | Encrypted key, confirmed time, last used step; hashed recovery codes |
@@ -95,15 +98,13 @@ UUID keys everywhere (no shared sequences), no cross-company foreign keys, files
 
 | Table | Purpose |
 |---|---|
-| `tenant_settings` | Time zone, second-approval threshold (default 10), retention, sign-in methods allowed, allowed email domains |
-| `teams`, `locations` | Grouping and holiday calendar selection |
-| `person_managers` | Secondary managers (primary stays on `people.manager_id`) |
-| `work_schedules` | Standard hours per day and work days per person (pending decision D3) |
+| `tenant_settings` (more columns) | Retention, sign-in methods allowed, allowed email domains |
+| `import_batches` | Parsed bulk-import files awaiting confirmation, expiring after one hour |
 | `plans`, `plan_levels`, `plan_assignments` | Plans, levels with days per year, one level per person per plan, effective dates |
 | `accrual_ledger` | Every credit and debit as a row: grant, accrual, proration, carryover, forfeiture, override, adjustment, booking. Balances are sums, never stored totals, so every number can be explained. |
 | `jurisdiction_rules` | Versioned, dated statutory rules: minimum entitlement by years of service, forfeiture rule, sick leave minimums and caps, by province, state and city |
 | `holidays` | Per jurisdiction and per company |
-| `requests`, `request_days`, `approval_steps` | Requests, the working days they cover (with half days), and each approval step |
+| `requests`, `request_days`, `approval_steps` | Requests, the working days they cover (with half days), and each approval step. Each request stores the requester's time zone at the time of request (`requester_time_zone`), the company zone in v1, so v1.1 home time zones need no data conversion. |
 | `calendar_feeds` | Hashed feed tokens per person and team |
 | `payroll_exports`, `payroll_codes` | Pay period files and plan to WorkLinks code mapping |
 | `notifications_outbox` | Emails queued in the same transaction as the change that caused them |
@@ -163,6 +164,12 @@ RFC 6238 codes (SHA-1, 6 digits, 30 seconds, one step of drift either way), veri
 - ICS feeds (v1): one hashed token per person and per team, resettable. Events carry name, dates, half-day marker and status (Busy, Free, Out of office). Private plans show "Out of office". Feeds set `Cache-Control: private` and an ETag; refresh timing is controlled by the calendar app.
 - Direct push (v1.1): per-person OAuth to Google Calendar API and Microsoft Graph; events written from the outbox within seconds; tokens encrypted like two-step keys.
 
+## 10.1 Time zones
+
+- All timestamps are stored in UTC (`timestamptz`). Leave dates are calendar dates (`date`), never timestamps, so a day off is the same day for everyone; ICS events are all-day `VALUE=DATE` events and do not shift between zones.
+- v1: one company time zone (`tenant_settings.time_zone`) decides "today", deadlines, reminders and year end. Each request stores `requester_time_zone`.
+- v1.1 (FR-64): `people.time_zone`, nullable, falls back to the company zone. Rules that depend on "today" (cannot book the past, approval deadlines, escalation timers) use the requester's zone. Display converts timestamps to the viewer's zone and labels the requester's zone when it differs. Reminders and digests are scheduled per recipient at a local hour (default 09:00). Calendar push writes all-day events, plus the person's own zone for any timed reminders. Report run labels state the zone used.
+
 # 11. Integrations
 
 | Integration | Design |
@@ -217,6 +224,7 @@ Environments: development (from `main`, synthetic data), production (from releas
 - Trunk-based: `main` always green; one branch per board item; pull request with the template; CI must pass; owner approves.
 - Releases tagged `v1.0.0`, `v1.1.0`; hotfixes `v1.0.x`.
 - GitHub branch protection is configured but not enforced on the free plan for a private repository; GitHub Pro (about US$4 a month) enforces it.
+- The PRD and TRD are updated after each merged feature, in a small documentation pull request, with a change log entry.
 
 # 17. Testing strategy
 
@@ -250,8 +258,8 @@ Structured logs without personal data beyond ids; error tracking hosted in Canad
 | T1 | App hosting on AWS: ECS Fargate or App Runner | App Runner for simplicity if available in Canada (Central) at release; otherwise Fargate |
 | T2 | Background jobs: Postgres queue or a managed queue | Postgres `SKIP LOCKED` queue (one less service) |
 | T3 | Error tracking with Canadian residency | Self-hosted or a vendor with a Canadian region |
-| T4 | Work schedules for part-time staff (PRD D3) | Include in v1: work days and hours per day per person |
-| T5 | Company time zone (PRD D4) | One per company |
+| T4 | ~~Work schedules for part-time staff~~ | Resolved: built as `people.work_days` and `people.hours_per_day` |
+| T5 | ~~Company time zone~~ | Resolved: built as `tenant_settings.time_zone`; per-person zone in v1.1 (section 10.1) |
 
 # 21. Traceability
 
@@ -262,9 +270,16 @@ Structured logs without personal data beyond ids; error tracking hosted in Canad
 | FR-20 to FR-22 | 5.2 |
 | FR-30 to FR-42 | 8 |
 | FR-50 to FR-57 | 9 |
-| FR-60 to FR-63 | 10 |
+| FR-60 to FR-64 | 10, 10.1 |
 | FR-70 to FR-80 | 12 |
 | FR-90 to FR-95 | 11 |
 | FR-100 | 13 |
 | FR-110 | 4, 14 |
 | NFR-01 to NFR-11 | 4, 14, 15, 17, 18 |
+
+# 22. Change log
+
+| Version | Date | Changes |
+|---|---|---|
+| 1.0 | 23 Oct 2026 | First full scope. |
+| 1.1 | 23 Oct 2026 | Migration 004 built (company settings, teams, locations, secondary managers, employee number, work days and hours per day). Added section 10.1 on time zones and `requester_time_zone` on requests. T4 and T5 resolved. Documentation updated after each merged feature. |

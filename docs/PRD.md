@@ -1,6 +1,6 @@
 ---
 title: "AAS Time Off Planner: Product Requirements Document"
-subtitle: "Version 1.0 draft for review"
+subtitle: "Version 1.1"
 date: "23 October 2026"
 ---
 
@@ -10,12 +10,12 @@ date: "23 October 2026"
 |---|---|
 | Product | AAS Time Off Planner |
 | Document | Product Requirements Document (PRD) |
-| Version | 1.0, draft for review |
+| Version | 1.1 (see change log, section 13) |
 | Date | 23 October 2026 |
 | Owner | Sean, Asensean (platform owner) |
 | Companion | Technical Requirements Document (TRD) v1.0 |
 | Sources | Requirements plan Draft 5 (`docs/PLAN.md`), roadmap board, owner decisions to date |
-| Status of build | Company setup, company data separation, short labels, email sign-in and two-step sign-in are built and merged to `main` |
+| Status of build | Built and merged to `main`: company setup, company data separation, short labels, email sign-in, two-step sign-in, people management, company settings |
 
 Requirement IDs (FR-, NFR-) are referenced by the TRD and by the roadmap board. Priorities: **M** must have for v1, **S** should have (v1.1), **C** could have (v1.2 or later).
 
@@ -79,7 +79,7 @@ Rules:
 | Release | Theme | Contents (board items) |
 |---|---|---|
 | v1 "Now" | First working version | Company setup and short labels; data separation; sign-in (email link, Google, Microsoft 365) and two-step for admins; people and managers; plan builder with levels; accrual engine; year-end with jurisdiction overrides; statutory minimums; requests, amend, cancel; approvals with second step; team calendar with privacy; calendar feed links; email notifications; core reports; XLSX and CSV export; WorkLinks pay period file; holiday calendars; audit log; security review; move to paid Canadian hosting |
-| v1.1 "Next" | Connected | Direct Google and Microsoft 365 calendar push; Jira absence issues; availability API and webhooks for Jira Automation; utilisation and payroll reconciliation reports; API keys; dark and light mode switch with dark default |
+| v1.1 "Next" | Connected | Direct Google and Microsoft 365 calendar push; Jira absence issues; availability API and webhooks for Jira Automation; utilisation and payroll reconciliation reports; API keys; dark and light mode switch with dark default; multiple time zones (home time zone per person) |
 | v1.2 "Later" | Chat | Slack and Microsoft Teams notifications and approvals |
 | Backlog | Not scheduled | Salary data and dollar liability; finance role; hourly employees and overtime; Google Sheets export; blackout periods; maximum off per team; hourly requests; mobile apps; dedicated database per company; Jira Forge app; MCP server for AI assistants |
 | Blocked | Outside dependency | WorkLinks live API (partner documentation); native Jira capacity (no Atlassian API) |
@@ -96,7 +96,7 @@ Rules:
 | FR-03 | Each company is reached at its own sign-in address (`name.<platform domain>`) or its own custom domain. Unknown addresses show "not found". | M | Company page shows its label and colour; unknown address returns 404. | Built |
 | FR-04 | HR admins can upload a logo and pick brand colours; the app checks text contrast against WCAG AA and adjusts button text automatically. | M | Low-contrast colour flagged; buttons stay readable. | Partly built (colour set at creation; upload and editing pending) |
 | FR-05 | Company selector for the platform owner is a dropdown of short labels, searchable when long. | M | Matches mock-up. | Pending |
-| FR-06 | Each company has a time zone used for "today", approval deadlines and year-end processing. | M | Year-end runs at midnight company time. | Pending (gap found while writing this PRD) |
+| FR-06 | Each company has a time zone used for "today", approval deadlines and year-end processing (default America/Toronto in Canada, America/New_York in the US). | M | Year-end runs at midnight company time. | Built (setting); used by the accrual engine when built |
 
 ## 6.2 Sign-in and access
 
@@ -113,9 +113,9 @@ Rules:
 
 | ID | Requirement | Pri | Acceptance criteria | Status |
 |---|---|---|---|---|
-| FR-20 | HR admins can add, edit and deactivate people: name, email, job title, team, location, jurisdiction (province or state, and city where a local law applies), start date, primary and secondary managers, role, standard hours per day, work days. | M | A manager must belong to the same company. | Partly built (core fields) |
-| FR-21 | Bulk import of people and opening balances from CSV or XLSX, with a preview and row-level errors before anything is saved. | M | | Pending |
-| FR-22 | Directory search by name, email, team, manager or location. | M | | Pending |
+| FR-20 | HR admins can add, edit and deactivate people: name, email, job title, team, location, jurisdiction (province or state, and city where a local law applies), start date, primary and secondary managers, role, standard hours per day, work days. | M | A manager must be active and belong to the same company; no one manages themselves; no management loops; at least one active HR admin remains; deactivation signs the person out. | Built (city-level jurisdiction pending) |
+| FR-21 | Bulk import of people and opening balances from CSV or XLSX, with a preview and row-level errors before anything is saved. | M | | In progress (people); opening balances follow the plan engine |
+| FR-22 | Directory search by name, email, team, manager, location or job title, with active, inactive or all. | M | | Built |
 
 ## 6.4 Plans and accrual
 
@@ -156,6 +156,7 @@ Rules:
 | FR-61 | Private, resettable calendar feed links (ICS) for each person and each team, for Google, Outlook and Apple. Names and dates only; no comments or balances. | M |
 | FR-62 | Direct Google Calendar and Microsoft 365 connection (events within seconds; optional Outlook out-of-office). | S |
 | FR-63 | Dark and light mode switch, dark by default, saved per person. | S |
+| FR-64 | Multiple time zones. Each person has a home time zone (default: company time zone). Requests are recorded against the requester's home time zone: dates, "today", past and future rules, half days, deadlines and escalations use it. Managers, HR and teammates see requests localized to their own zone, with the requester's zone shown when it differs. Calendar entries, reminders and notifications go out in each recipient's zone; reminders at a sensible local hour. Reports state the time zone in the run label. | S |
 
 ## 6.7 Reports and exports
 
@@ -248,8 +249,8 @@ All reports are HR admin only. Each shows title, company legal name, filters and
 |---|---|---|
 | D1 | Platform domain (for example aas-timeoff.ca) | Google and Microsoft sign-in |
 | D2 | Google and Microsoft app registrations (instructions sent separately) | Google and Microsoft sign-in |
-| D3 | Part-time and non-standard work weeks: support in v1 (recommended, small) or backlog | People and accrual engine |
-| D4 | Company time zones: one per company (recommended) or per person | Accrual and year-end |
+| D3 | ~~Part-time and non-standard work weeks~~ Resolved: in v1 (work days and hours per day per person, built) | |
+| D4 | ~~Company time zones~~ Resolved: one per company in v1 (built); home time zone per person in v1.1 (FR-64) | |
 | D5 | WorkLinks file format and partner contact | Payroll export |
 | D6 | GitHub Pro upgrade | Before more contributors |
 | D7 | Legal reviewer for statutory tables | Before release |
@@ -266,3 +267,10 @@ All reports are HR admin only. Each shows title, company legal name, filters and
 | Level | A version of a plan with its own days per year (Vacation Senior 20) |
 | Run | Consecutive working days off, joined across bookings |
 | Jurisdiction | Province or state (and city) whose employment law applies to a person |
+
+# 13. Change log
+
+| Version | Date | Changes |
+|---|---|---|
+| 1.0 | 23 Oct 2026 | First full scope. |
+| 1.1 | 23 Oct 2026 | D3 and D4 resolved (part-time work weeks and company time zone in v1, both built). FR-06, FR-20 and FR-22 built. FR-21 in progress. Added FR-64, multiple time zones, to v1.1. These documents are now updated after each merged feature. |
