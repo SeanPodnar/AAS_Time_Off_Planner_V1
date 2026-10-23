@@ -13,6 +13,9 @@
 - Required before merge: automated checks green (lint, type check, unit tests, cross-company data isolation tests) and owner approval.
 - Never commit secrets, API keys or real employee data. Secrets live in the hosting provider's secret store.
 
+## Documentation
+- After each feature pull request is merged, `docs/PRD.md` and `docs/TRD.md` are updated (status, decisions, design changes, change log) in a small `docs/` pull request, and the Word and PDF copies in `docs/files/` are rebuilt with `python3 docs/tools/build_docs.py`.
+
 ## Releases and environments
 - Development: deploys automatically from `main` to the free tier. Synthetic data only.
 - Production: deploys only from release tags (`v1.0.0` for the Now column, `v1.1.0` for Next, and so on), and only after the security review and the move to paid Canadian hosting are done.
