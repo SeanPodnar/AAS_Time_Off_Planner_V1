@@ -11,7 +11,7 @@ export async function requestContext() {
   return { site, user, company, actor };
 }
 
-/** Count for the header badge. Only people who can approve get a query. */
-export async function approvalsBadge(company: Parameters<typeof approvalCount>[0], actor: Actor, user: { isManager: boolean; role: string }) {
-  return user.isManager || user.role === "admin" ? approvalCount(company, actor) : 0;
+/** Count for the header badge. Anyone can be an approver while covering as a backup, so everyone is counted. */
+export async function approvalsBadge(company: Parameters<typeof approvalCount>[0], actor: Actor) {
+  return approvalCount(company, actor);
 }

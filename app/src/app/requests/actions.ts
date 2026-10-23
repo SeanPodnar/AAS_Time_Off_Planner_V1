@@ -7,6 +7,7 @@ import { adjustBalance, adminAddTimeOff, amendRequest, cancelRequest, decideRequ
 import { requestContext } from "./context";
 import { safeReturn } from "./format";
 import { companyFor } from "@/lib/requests/company";
+import { removeBackup, setBackup } from "@/lib/requests/followups";
 
 export type RequestFormState = { errors?: Record<string, string>; values?: Record<string, string>; summary?: Summary };
 
@@ -111,4 +112,23 @@ export async function adjustBalanceAction(_prev: AdminFormState, form: FormData)
   if (!r.ok) return { values: vals, errors: r.errors };
   revalidatePath(`/people/${personId}`);
   redirect(`/people/${personId}?adjusted=1`);
+}
+
+/** Set a backup approver for a date range. Results come back as query params on /approvals. */
+export async function setBackupAction(form: FormData) {
+  const { company, actor } = await requestContext();
+  const r = await guard(() => setBackup(company, actor, {
+    approverId: text(form, "approverId"), backupId: text(form, "backupId"), startDate: text(form, "startDate").trim(), endDate: text(form, "endDate").trim(),
+  }));
+  revalidatePath("/approvals");
+  if (!r.ok) redirect(`/approvals?backupError=${encodeURIComponent(Object.values(r.errors)[0])}`);
+  redirect("/approvals?backup=set");
+}
+
+export async function removeBackupAction(form: FormData) {
+  const { company, actor } = await requestContext();
+  const r = await guard(() => removeBackup(company, actor, text(form, "id")));
+  revalidatePath("/approvals");
+  if (!r.ok) redirect(`/approvals?backupError=${encodeURIComponent(Object.values(r.errors)[0])}`);
+  redirect("/approvals?backup=removed");
 }

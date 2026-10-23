@@ -576,8 +576,9 @@ async function rows(tx: Tx, company: Company, actor: Actor, where: postgres.Pend
      where ${where} order by r.start_date desc, r.created_at desc limit 200`;
   if (rs.length === 0) return [];
   const steps = await tx`
-    select s.request_id, s.step_no, s.role, s.status, s.comment, s.decided_at, s.override, a.full_name as approver
-      from approval_steps s left join people a on a.id = s.approver_id where s.request_id = any(${rs.map((r) => r.id)}::uuid[]) order by s.step_no`;
+    select s.request_id, s.step_no, s.role, s.status, s.comment, s.decided_at, s.override, a.full_name as approver,
+           s.decided_by, s.approver_id, k.full_name as decider
+      from approval_steps s left join people a on a.id = s.approver_id left join people k on k.id = s.decided_by where s.request_id = any(${rs.map((r) => r.id)}::uuid[]) order by s.step_no`;
   const now = todayIn(company.timeZone);
   return rs.map((r) => {
     const live = r.status === "pending" || r.status === "approved";
@@ -587,7 +588,7 @@ async function rows(tx: Tx, company: Company, actor: Actor, where: postgres.Pend
       id: r.id, personId: r.person_id, personName: r.full_name, planId: r.plan_id, planName: r.plan_name, unit: r.unit,
       kind: r.kind, targetId: r.target_id, startDate: d(r.start_date), endDate: d(r.end_date), startPart: r.start_part, endPart: r.end_part,
       days: Number(r.days), amount: Number(r.amount), status: r.status, comment: r.comment, adminReason: r.admin_reason, createdAt: new Date(r.created_at).toISOString(),
-      steps: steps.filter((s) => s.request_id === r.id).map((s) => ({ stepNo: s.step_no, role: s.role, approverName: s.approver ?? "HR", status: s.status, comment: s.comment, decidedAt: s.decided_at ? new Date(s.decided_at).toISOString() : null, override: s.override })),
+      steps: steps.filter((s) => s.request_id === r.id).map((s) => ({ stepNo: s.step_no, role: s.role, approverName: s.decided_by && s.decided_by !== s.approver_id && s.decider ? `${s.decider}${s.override ? " (HR override)" : s.role === "admin" ? "" : ` for ${s.approver}`}` : s.approver ?? "HR", status: s.status, comment: s.comment, decidedAt: s.decided_at ? new Date(s.decided_at).toISOString() : null, override: s.override })),
       openFollowUp: r.open_follow_up ?? null,
       canAmend: live && r.kind !== "cancel" && !r.open_follow_up && (r.status === "pending" || !started || actor.role === "admin"),
       canCancel: live && !(r.kind === "cancel" && r.status === "approved") && !r.open_follow_up && (r.status === "pending" || !started || actor.role === "admin") && (own || actor.role === "admin"),

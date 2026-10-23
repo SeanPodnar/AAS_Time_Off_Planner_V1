@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 
 export default async function NewRequestPage() {
   const { site, user, company, actor } = await requestContext();
-  const [plans, approvals] = await Promise.all([requestablePlans(company, actor), approvalsBadge(company, actor, user)]);
+  const [plans, approvals] = await Promise.all([requestablePlans(company, actor), approvalsBadge(company, actor)]);
   return (
     <div style={brandStyle(site.tenant)}>
       <CompanyHeader tenant={site.tenant} user={user} current="/" approvals={approvals} />

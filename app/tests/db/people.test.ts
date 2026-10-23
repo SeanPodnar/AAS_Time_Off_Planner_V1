@@ -91,11 +91,13 @@ describe.skipIf(!hasDb)("people management", () => {
   });
 
   it("stores company settings with sensible defaults", async () => {
-    expect(await getSettings(A, "CA")).toEqual({ timeZone: "America/Toronto", secondApprovalThreshold: 10 });
-    expect(await saveSettings(A, admin, { timeZone: "Mars/Base", secondApprovalThreshold: "10" })).toMatchObject({ ok: false, errors: { timeZone: expect.any(String) } });
-    expect(await saveSettings(A, admin, { timeZone: "America/Vancouver", secondApprovalThreshold: "15" })).toEqual({ ok: true });
-    expect(await getSettings(A, "CA")).toEqual({ timeZone: "America/Vancouver", secondApprovalThreshold: 15 });
-    expect(await getSettings(B, "US")).toEqual({ timeZone: "America/New_York", secondApprovalThreshold: 10 });
+    const r = { reminderAfterDays: "2", escalateAfterDays: "5" };
+    expect(await getSettings(A, "CA")).toEqual({ timeZone: "America/Toronto", secondApprovalThreshold: 10, reminderAfterDays: 2, escalateAfterDays: 5 });
+    expect(await saveSettings(A, admin, { timeZone: "Mars/Base", secondApprovalThreshold: "10", ...r })).toMatchObject({ ok: false, errors: { timeZone: expect.any(String) } });
+    expect(await saveSettings(A, admin, { timeZone: "America/Vancouver", secondApprovalThreshold: "15", reminderAfterDays: "3", escalateAfterDays: "7" })).toEqual({ ok: true });
+    expect(await getSettings(A, "CA")).toEqual({ timeZone: "America/Vancouver", secondApprovalThreshold: 15, reminderAfterDays: 3, escalateAfterDays: 7 });
+    expect(await saveSettings(A, admin, { timeZone: "America/Vancouver", secondApprovalThreshold: "15", reminderAfterDays: "4", escalateAfterDays: "4" })).toMatchObject({ ok: false, errors: { escalateAfterDays: "Escalate after more days than the reminder." } });
+    expect(await getSettings(B, "US")).toEqual({ timeZone: "America/New_York", secondApprovalThreshold: 10, reminderAfterDays: 2, escalateAfterDays: 5 });
   });
 
   async function asInput(id: string) {

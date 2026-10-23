@@ -14,7 +14,7 @@ export default async function SettingsPage() {
       <CompanyHeader tenant={site.tenant} user={user} current="/settings" />
       <main className="wrap">
         <h1>Company settings</h1>
-        <SettingsForm timeZone={s.timeZone} threshold={s.secondApprovalThreshold} zones={timeZoneChoices()} />
+        <SettingsForm timeZone={s.timeZone} threshold={s.secondApprovalThreshold} reminderAfterDays={s.reminderAfterDays} escalateAfterDays={s.escalateAfterDays} zones={timeZoneChoices()} />
       </main>
     </div>
   );

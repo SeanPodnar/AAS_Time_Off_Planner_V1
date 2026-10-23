@@ -32,7 +32,8 @@ export async function setStatusAction(form: FormData) {
 
 export async function saveSettingsAction(_prev: FormState, form: FormData): Promise<FormState> {
   const { site, actor } = await requireAdmin();
-  const values = { timeZone: String(form.get("timeZone") ?? ""), secondApprovalThreshold: String(form.get("secondApprovalThreshold") ?? "") };
+  const values = { timeZone: String(form.get("timeZone") ?? ""), secondApprovalThreshold: String(form.get("secondApprovalThreshold") ?? ""),
+    reminderAfterDays: String(form.get("reminderAfterDays") ?? ""), escalateAfterDays: String(form.get("escalateAfterDays") ?? "") };
   const r = await saveSettings(site.tenant.id, actor, values);
   return r.ok ? { saved: true, values } : { errors: r.errors, values };
 }
