@@ -16,7 +16,8 @@
     "test:unit": "vitest run tests/unit",
     "test:db": "vitest run tests/db",
     "db:migrate": "tsx scripts/migrate.ts",
-    "db:seed": "tsx scripts/seed.ts"
+    "db:seed": "tsx scripts/seed.ts",
+    "platform:add-owner": "tsx scripts/add-platform-owner.ts"
   },
   "dependencies": {
     "next": "15.5.28",

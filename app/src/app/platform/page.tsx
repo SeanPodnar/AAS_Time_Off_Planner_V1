@@ -1,20 +1,23 @@
-import { notFound } from "next/navigation";
 import { listTenants } from "@/lib/tenants";
-import { devPlatformEnabled } from "@/lib/flags";
+import { requirePlatformOwner } from "@/lib/session";
+import { signOut } from "../login/actions";
 import { meetsAA } from "@/lib/color";
 import { CreateCompanyForm } from "./CreateCompanyForm";
 
 export const dynamic = "force-dynamic";
 
 export default async function PlatformPage() {
-  if (!devPlatformEnabled()) notFound();
+  const owner = await requirePlatformOwner();
   const tenants = await listTenants();
   const root = process.env.ROOT_DOMAIN ?? "localhost";
   return (
     <main className="wrap">
-      <div>
-        <h1>Companies</h1>
-        <p className="muted">Development console. Sign-in for the platform owner arrives with the next roadmap item; until then this page only runs locally.</p>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 12, flexWrap: "wrap" }}>
+        <div>
+          <h1>Companies</h1>
+          <p className="muted">Signed in as {owner.fullName}. Each company&apos;s data stays separate; this list shows company details only.</p>
+        </div>
+        <form action={signOut}><button className="btn" type="submit">Sign out</button></form>
       </div>
       <div className="tablewrap">
         <table>

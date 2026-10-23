@@ -121,6 +121,21 @@ describe.skipIf(!hasDb)("company data separation", () => {
     await expect(platform`insert into tenants (legal_name, short_label, subdomain, country) values ('X', 'X co', 'Bad_Sub', 'CA')`).rejects.toMatchObject({ code: "23514" });
   });
 
+  it("has row-level security forced on every table that holds company data", async () => {
+    // Guards future migrations: a new table with tenant_id but no policy fails here.
+    const rows = await admin`
+      select c.relname, c.relrowsecurity, c.relforcerowsecurity,
+             (select count(*)::int from pg_policies p where p.tablename = c.relname and 'aas_app' = any(p.roles)) as app_policies
+        from pg_class c join pg_attribute a on a.attrelid = c.oid
+       where c.relkind = 'r' and c.relnamespace = 'public'::regnamespace and a.attname = 'tenant_id' and not a.attisdropped
+       order by c.relname`;
+    expect(rows.length).toBeGreaterThanOrEqual(4);
+    for (const r of rows) {
+      expect({ table: r.relname, rls: r.relrowsecurity, forced: r.relforcerowsecurity, hasPolicy: r.app_policies > 0 })
+        .toEqual({ table: r.relname, rls: true, forced: true, hasPolicy: true });
+    }
+  });
+
   it("runtime roles cannot bypass row-level security", async () => {
     const rows = await admin`select rolname, rolbypassrls, rolsuper from pg_roles where rolname in ('aas_app', 'aas_platform') order by rolname`;
     expect(rows).toEqual([
