@@ -1,6 +1,6 @@
 ---
 title: "AAS Time Off Planner: Technical Requirements Document"
-subtitle: "Version 1.2"
+subtitle: "Version 1.3"
 date: "23 October 2026"
 ---
 
@@ -9,11 +9,11 @@ date: "23 October 2026"
 | Item | Detail |
 |---|---|
 | Document | Technical Requirements Document (TRD) |
-| Version | 1.2 (see change log, section 22) |
+| Version | 1.3 (see change log, section 22) |
 | Date | 23 October 2026 |
-| Companion | Product Requirements Document (PRD) v1.0; requirement IDs FR- and NFR- refer to it |
+| Companion | Product Requirements Document (PRD) v1.3; requirement IDs FR- and NFR- refer to it |
 | Code | `github.com/SeanPodnar/AAS_Time_Off_Planner_V1`, folder `app/` |
-| Built so far | Migrations 001 to 005: companies, people, audit log, company data separation, email sign-in, sessions, roles, platform owner sign-in, two-step sign-in, people management, company settings, bulk import of people. 84 automated tests. |
+| Built so far | Migrations 001 to 006: companies, people, audit log, company data separation, email sign-in, sessions, roles, platform owner sign-in, two-step sign-in, people management, company settings, bulk import of people, time off plans, accrual ledger, statutory reference rules, balances. 124 automated tests. |
 
 # 2. Architecture
 
@@ -80,7 +80,7 @@ UUID keys everywhere (no shared sequences), no cross-company foreign keys, files
 
 # 5. Data model
 
-## 5.1 Built (migrations 001 to 005)
+## 5.1 Built (migrations 001 to 006)
 
 | Table | Purpose | Key columns |
 |---|---|---|
@@ -94,15 +94,17 @@ UUID keys everywhere (no shared sequences), no cross-company foreign keys, files
 | `login_tokens`, `sessions` | Email sign-in | SHA-256 token hashes, expiry, used or revoked time, method, mfa_at |
 | `mfa_factors`, `mfa_recovery_codes` | Two-step sign-in | Encrypted key, confirmed time, last used step; hashed recovery codes |
 | `platform_owners`, `platform_login_tokens`, `platform_sessions`, `platform_mfa_factors`, `platform_mfa_recovery_codes` | Platform owner sign-in | Reachable only by `aas_platform` |
+| `plans` | Time off plans | category, unit (days or hours), accrual method and timing, plan year start, proration and rounding, carryover rule, cap, expiry, maximum balance, approval and privacy settings. Name unique per company ignoring case |
+| `plan_levels` | Levels per plan | annual amount in the plan's unit, tenure tiers as JSON `[{years, amount}]` |
+| `plan_assignments` | One level per person per plan at a time | effective_from, effective_to (exclusive, null for open) |
+| `accrual_ledger` | Every balance movement | effective_date, plan_year, kind, amount, unique source_key per company, reason, rule_ref. Append-only: the app role has select and insert only |
+| `jurisdiction_rules` | Statutory reference data, not company data (no tenant_id) | jurisdiction, rule kind (min_entitlement, no_forfeit, forfeit_conditional), years of service, amount in weeks, effective_from, verified flag |
 
 ## 5.2 Planned for v1
 
 | Table | Purpose |
 |---|---|
 | `tenant_settings` (more columns) | Retention, sign-in methods allowed, allowed email domains |
-| `plans`, `plan_levels`, `plan_assignments` | Plans, levels with days per year, one level per person per plan, effective dates |
-| `accrual_ledger` | Every credit and debit as a row: grant, accrual, proration, carryover, forfeiture, override, adjustment, booking. Balances are sums, never stored totals, so every number can be explained. |
-| `jurisdiction_rules` | Versioned, dated statutory rules: minimum entitlement by years of service, forfeiture rule, sick leave minimums and caps, by province, state and city |
 | `holidays` | Per jurisdiction and per company |
 | `requests`, `request_days`, `approval_steps` | Requests, the working days they cover (with half days), and each approval step. Each request stores the requester's time zone at the time of request (`requester_time_zone`), the company zone in v1, so v1.1 home time zones need no data conversion. |
 | `calendar_feeds` | Hashed feed tokens per person and team |
@@ -141,15 +143,19 @@ RFC 6238 codes (SHA-1, 6 digits, 30 seconds, one step of drift either way), veri
 - The email in the token must be verified and must match an active person in that company. No accounts are created from sign-in.
 - Secrets: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET` in the secret store. Microsoft secrets expire within 24 months; a reminder job warns 30 days ahead.
 
-# 8. Accrual engine (FR-30 to FR-42)
+# 8. Accrual engine (FR-30 to FR-43)
 
-- Ledger-based: every balance movement is a dated row in `accrual_ledger`. A balance at any date is the sum of rows up to that date plus projected future accruals. Reports and the request form use the same function.
-- Accrual job runs nightly per company at 01:00 company time and is idempotent (each row has a unique key per person, plan, period and kind), so reruns never double-credit.
-- Proration: remaining months including the start month if the start date is on or before the 15th; rounded per plan (default nearest half day; hours plans to 0.25 h).
-- Hours plans: salaried staff accrue on their standard week (default 40 hours); requests deduct standard hours per day per day booked.
-- Year end: a job 30 days ahead builds the preview; at midnight on the plan year boundary it applies the plan rule, then jurisdiction overrides (`jurisdiction_rules` effective at that date), writing each step as ledger rows with the rule id that caused it.
-- Statutory checks are pure functions over the rules table: on plan save, nightly for anniversaries within 90 days, and in the compliance report.
-- Working day count: dates between first and last day, minus weekends (from the person's work schedule), minus holidays for the person's jurisdiction and company, with half days on the first and last day.
+- Built in `app/src/lib/accrual/`: `dates.ts` (calendar dates), `rules.ts` (statutory rules), `schedule.ts` (pure engine with no database access), `post.ts` (loading, posting and balances).
+- Ledger-based: every balance movement is a dated row in `accrual_ledger`. A balance on a date is the sum of rows on or before it. Each row has a deterministic `source_key`, and posting uses `on conflict do nothing`, so reruns never double-credit.
+- Earning methods: lump sum (plan year start, hire date or work anniversary), periodic (annual, semi-annual, quarterly or monthly, credited at the start or end of each period), and hours worked (salaried staff on their standard schedule, credited at each month end).
+- Proration: months remaining, counting the start month when the start is on or before the 15th, rounded per plan to the half day (days) or quarter hour (hours). A start that still counts every month of a period gets the regular amount. Level and tenure changes mid-year add the prorated difference.
+- Maximum balance: a credit is reduced to the room left under the cap, with the reason recorded.
+- Year end: once a new plan year starts, the plan rule (none, capped, unlimited or maximum balance) writes a forfeit row; then jurisdiction rules effective that day write override rows naming the rule. US no-forfeit states keep everything. Canadian provinces keep up to the statutory minimum (weeks converted to days by the person's work days per week), counting what the plan already carries. Notice-required states (IL, MA) produce a warning, not a block.
+- Carried days expire on the plan's expiry date if not used; bookings use carried days first. Expiry is blocked in no-forfeit states and limited to amounts above the statutory minimum in Canada.
+- Posting today runs when a balance is viewed, for that person, using the company's own date (`todayIn` with the company time zone). A nightly job per company comes with requests and approvals.
+- Balances return the amount available today, leave booked ahead, the projected balance at plan year end and, for HR admins, compliance notes (below the statutory minimum, next minimum step, figures pending legal review).
+- Statutory figures in migration 006 come from secondary sources and are marked `verified = false` until the legal review (PRD D7).
+- Working day count for requests: dates between first and last day, minus non-working days from the person's schedule, minus holidays for the person's jurisdiction and company, with half days on the first and last day (built with requests).
 
 # 9. Approval workflow (FR-50 to FR-57)
 
@@ -234,7 +240,7 @@ Environments: development (from `main`, synthetic data), production (from releas
 | Unit | Validation, host parsing, contrast, tokens, rate limits, TOTP (RFC vectors), encryption, accrual and day-count functions | Every PR |
 | Database | Separation tests (cannot read, insert, move, update, delete across companies; no cross-company links; no leak across pooled connections; role limits; guard test), sign-in and two-step flows against Postgres 16 | Every PR |
 | End to end | Browser runs of each role's main flows (Playwright) | Each feature PR; automated in CI in v1 |
-| Accrual golden tests | Worked examples per province and state checked by the legal reviewer | Before release |
+| Accrual golden tests | Worked examples for proration, periodic credits, tenure, maximum balance, year end, overrides and expiry (20 cases built); province and state examples to be checked by the legal reviewer | Every PR; legal check before release |
 | Security | Dependency audit every PR; penetration test before release | |
 
 # 18. Observability and operations
@@ -251,6 +257,10 @@ Structured logs without personal data beyond ids; error tracking hosted in Canad
 | `X-Forwarded-Host` trusted | Load balancer must overwrite the header; documented in deployment checklist |
 | Branch protection not enforced | GitHub Pro |
 | Two-step not offered to employees | Decision D8 |
+| Accruals post when a balance is viewed, not nightly | Nightly job per company with requests and approvals |
+| Changing a level's amount or a plan's carryover rule applies from the next posting only; rows already posted are not recalculated | Admin adjustment screen; recalculation preview later |
+| Inactive people are skipped by posting | Revisit with offboarding and payout reports |
+| Canadian statutory protection counts carried days toward the minimum (the reading less generous to employees) | Confirm with the legal reviewer (PRD D7) |
 
 # 20. Open technical decisions
 
@@ -269,7 +279,7 @@ Structured logs without personal data beyond ids; error tracking hosted in Canad
 | FR-01 to FR-06 | 4, 5, 6 |
 | FR-10 to FR-15 | 7 |
 | FR-20 to FR-22 | 5.2 |
-| FR-30 to FR-42 | 8 |
+| FR-30 to FR-43 | 5.1, 8 |
 | FR-50 to FR-57 | 9 |
 | FR-60 to FR-64 | 10, 10.1 |
 | FR-70 to FR-80 | 12 |
@@ -285,3 +295,4 @@ Structured logs without personal data beyond ids; error tracking hosted in Canad
 | 1.0 | 23 Oct 2026 | First full scope. |
 | 1.1 | 23 Oct 2026 | Migration 004 built (company settings, teams, locations, secondary managers, employee number, work days and hours per day). Added section 10.1 on time zones and `requester_time_zone` on requests. T4 and T5 resolved. Documentation updated after each merged feature. |
 | 1.2 | 23 Oct 2026 | Migration 005 (import_batches) built for bulk import of people. Model delegation rule added to the delivery process. |
+| 1.3 | 23 Oct 2026 | Migration 006 built: plans, levels, assignments, append-only accrual ledger, statutory reference rules. Section 8 rewritten for the built engine. Testing, known limitations and traceability updated. 124 automated tests. |

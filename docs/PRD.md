@@ -1,6 +1,6 @@
 ---
 title: "AAS Time Off Planner: Product Requirements Document"
-subtitle: "Version 1.2"
+subtitle: "Version 1.3"
 date: "23 October 2026"
 ---
 
@@ -10,12 +10,12 @@ date: "23 October 2026"
 |---|---|
 | Product | AAS Time Off Planner |
 | Document | Product Requirements Document (PRD) |
-| Version | 1.2 (see change log, section 13) |
+| Version | 1.3 (see change log, section 13) |
 | Date | 23 October 2026 |
 | Owner | Sean, Asensean (platform owner) |
-| Companion | Technical Requirements Document (TRD) v1.0 |
+| Companion | Technical Requirements Document (TRD) v1.3 |
 | Sources | Requirements plan Draft 5 (`docs/PLAN.md`), roadmap board, owner decisions to date |
-| Status of build | Built and merged to `main`: company setup, company data separation, short labels, email sign-in, two-step sign-in, people management, company settings, bulk import of people |
+| Status of build | Built and merged to `main`: company setup, company data separation, short labels, email sign-in, two-step sign-in, people management, company settings, bulk import of people, time off plans with levels and assignments, accrual engine and balances |
 
 Requirement IDs (FR-, NFR-) are referenced by the TRD and by the roadmap board. Priorities: **M** must have for v1, **S** should have (v1.1), **C** could have (v1.2 or later).
 
@@ -81,7 +81,7 @@ Rules:
 | v1 "Now" | First working version | Company setup and short labels; data separation; sign-in (email link, Google, Microsoft 365) and two-step for admins; people and managers; plan builder with levels; accrual engine; year-end with jurisdiction overrides; statutory minimums; requests, amend, cancel; approvals with second step; team calendar with privacy; calendar feed links; email notifications; core reports; XLSX and CSV export; WorkLinks pay period file; holiday calendars; audit log; security review; move to paid Canadian hosting |
 | v1.1 "Next" | Connected | Direct Google and Microsoft 365 calendar push; Jira absence issues; availability API and webhooks for Jira Automation; utilisation and payroll reconciliation reports; API keys; dark and light mode switch with dark default; multiple time zones (home time zone per person) |
 | v1.2 "Later" | Chat | Slack and Microsoft Teams notifications and approvals |
-| Backlog | Not scheduled | Salary data and dollar liability; finance role; hourly employees and overtime; Google Sheets export; blackout periods; maximum off per team; hourly requests; mobile apps; dedicated database per company; Jira Forge app; MCP server for AI assistants |
+| Backlog | Not scheduled | Salary data and dollar liability; finance role; hourly employees and overtime; Google Sheets export; blackout periods; maximum off per team; hourly requests; mobile apps; dedicated database per company; Jira Forge app; MCP server for AI assistants; demo videos for each persona with English captions; guided in-app help for each persona with an on/off preference; French interface for Quebec (future item, only if a company hires someone working in Quebec) |
 | Blocked | Outside dependency | WorkLinks live API (partner documentation); native Jira capacity (no Atlassian API) |
 | Declined | | Confluence "Who's out" page; Bradford Factor report |
 
@@ -119,21 +119,22 @@ Rules:
 
 ## 6.4 Plans and accrual
 
-| ID | Requirement | Pri | Acceptance criteria |
-|---|---|---|---|
-| FR-30 | Unlimited admin-defined plans (starter templates: Vacation, Wellbeing, Sick, Personal, Bereavement, Parental, Unpaid, Lieu). | M | |
-| FR-31 | Plan levels: each plan can have levels with their own days per year; each person has one level per plan; a mid-year level change prorates the rest of the plan year. | M | |
-| FR-32 | Plan year starts on any date (default 1 January), set per plan. | M | |
-| FR-33 | Units: days and half days (default) or hours. Requests are always in days and half days; hours plans deduct the person's standard hours per day. | M | |
-| FR-34 | Accrual methods: lump sum (at plan year start, on hire, or on anniversary), periodic (annual, semi-annual, quarterly, monthly; credited at period start, or end if chosen), per hours worked (salaried staff on their standard week), manual grants with reason. | M | |
-| FR-35 | First year prorated from the start date by remaining months (start month counts if on or before the 15th), rounded to the nearest half day; configurable per plan. | M | 15 days, start 10 June: 8.75 rounds to 9.0. |
-| FR-36 | Year end per plan: no carryover, capped carryover with optional expiry date, unlimited, or maximum balance cap; payout flag for reporting. | M | |
-| FR-37 | Jurisdiction overrides apply automatically at year end (for example, no forfeiture of earned vacation in California, Colorado, Montana and Nebraska; statutory vacation in Canada cannot simply expire). Each override is shown in the year-end preview and the audit log. | M | |
-| FR-38 | Statutory minimum table by province and state and years of service. Warnings on plan save, ahead of service anniversaries, and in a compliance report. The app warns; it does not block. | M | |
-| FR-39 | Tenure increases per plan, off by default. | M | |
-| FR-40 | Other plan settings: approval mode, negative balance limit, waiting period, coworker visibility (plan name, Out of office, hidden), calendar status, working days or calendar days, tracked only. | M | |
-| FR-41 | Holiday calendars per province and state, preloaded and editable, plus company holidays. | M | |
-| FR-42 | Balance projection to plan year end and to any future date. | M | |
+| ID | Requirement | Pri | Acceptance criteria | Status |
+|---|---|---|---|---|
+| FR-30 | Unlimited admin-defined plans (starter templates: Vacation, Wellbeing, Sick, Personal, Bereavement, Parental, Unpaid, Lieu). | M |  | Built (starter templates: Vacation, Wellbeing, Sick, Personal, Unpaid; all nine categories available) |
+| FR-31 | Plan levels: each plan can have levels with their own days per year; each person has one level per plan; a mid-year level change prorates the rest of the plan year. | M |  | Built |
+| FR-32 | Plan year starts on any date (default 1 January), set per plan. | M |  | Built (day 1 to 28 of any month) |
+| FR-33 | Units: days and half days (default) or hours. Requests are always in days and half days; hours plans deduct the person's standard hours per day. | M |  | Partly built (days or hours per plan; deduction comes with requests) |
+| FR-34 | Accrual methods: lump sum (at plan year start, on hire, or on anniversary), periodic (annual, semi-annual, quarterly, monthly; credited at period start, or end if chosen), per hours worked (salaried staff on their standard week), manual grants with reason. | M |  | Built except manual grants (ledger supports adjustments; screen pending) |
+| FR-35 | First year prorated from the start date by remaining months (start month counts if on or before the 15th), rounded to the nearest half day; configurable per plan. | M | 15 days, start 10 June: 8.75 rounds to 9.0. | Built |
+| FR-36 | Year end per plan: no carryover, capped carryover with optional expiry date, unlimited, or maximum balance cap; payout flag for reporting. | M |  | Built (payout flag stored; payout report pending) |
+| FR-37 | Jurisdiction overrides apply automatically at year end (for example, no forfeiture of earned vacation in California, Colorado, Montana and Nebraska; statutory vacation in Canada cannot simply expire). Each override is shown in the year-end preview and the audit log. | M |  | Built in the engine (overrides are ledger rows naming the rule); year-end preview pending |
+| FR-38 | Statutory minimum table by province and state and years of service. Warnings on plan save, ahead of service anniversaries, and in a compliance report. The app warns; it does not block. | M |  | Partly built (table seeded, marked unverified pending legal review; warnings on the admin's person page; plan-save warning and compliance report pending) |
+| FR-39 | Tenure increases per plan, off by default. | M |  | Built |
+| FR-40 | Other plan settings: approval mode, negative balance limit, waiting period, coworker visibility (plan name, Out of office, hidden), calendar status, working days or calendar days, tracked only. | M |  | Stored; enforced when requests are built |
+| FR-41 | Holiday calendars per province and state, preloaded and editable, plus company holidays. | M |  | Pending |
+| FR-42 | Balance projection to plan year end and to any future date. | M |  | Partly built (projection to plan year end; any future date pending) |
+| FR-43 | A plan's unit, earning method, plan year start, lump sum timing and frequency cannot change once the plan has balances; the admin creates a new plan instead. | M | Saving such a change shows a message on the field. | Built |
 
 ## 6.5 Requests and approvals
 
@@ -253,7 +254,7 @@ All reports are HR admin only. Each shows title, company legal name, filters and
 | D4 | ~~Company time zones~~ Resolved: one per company in v1 (built); home time zone per person in v1.1 (FR-64) | |
 | D5 | WorkLinks file format and partner contact | Payroll export |
 | D6 | GitHub Pro upgrade | Before more contributors |
-| D7 | Legal reviewer for statutory tables | Before release |
+| D7 | Legal reviewer for statutory tables | Before release (statutory figures are in the app, marked unverified) |
 | D8 | Should employees and managers also be offered (optional) two-step sign-in? | Before release |
 | D9 | Release budget for Canadian hosting (estimate in TRD) | Release |
 
@@ -275,3 +276,4 @@ All reports are HR admin only. Each shows title, company legal name, filters and
 | 1.0 | 23 Oct 2026 | First full scope. |
 | 1.1 | 23 Oct 2026 | D3 and D4 resolved (part-time work weeks and company time zone in v1, both built). FR-06, FR-20 and FR-22 built. FR-21 in progress. Added FR-64, multiple time zones, to v1.1. These documents are now updated after each merged feature. |
 | 1.2 | 23 Oct 2026 | FR-21 bulk import of people built (opening balances follow the plan engine). Added the model delegation rule: simpler work goes to lower AI models and is reviewed; the owner is asked before escalating to a higher model. |
+| 1.3 | 23 Oct 2026 | FR-30 to FR-42 status added: plans, levels, assignments, accrual engine, year-end carryover and expiry, jurisdiction overrides and balances built. Added FR-43 (plan settings lock once balances exist). Backlog: persona demo videos with captions, guided in-app help, French interface for Quebec as a future item (no Quebec companies or staff today). |
