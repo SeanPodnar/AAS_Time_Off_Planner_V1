@@ -255,3 +255,9 @@ export async function listActivePeopleNames(tenantId: string): Promise<{ id: str
   return withTenant(tenantId, async (tx) =>
     (await tx`select id, full_name from people where status = 'active' order by lower(full_name), id`).map((r) => ({ id: r.id as string, fullName: r.full_name as string })));
 }
+
+/** Distinct jurisdictions of active people with head counts, most common first. */
+export async function peopleJurisdictions(tenantId: string): Promise<{ jurisdiction: string; count: number }[]> {
+  const rows = await withTenant(tenantId, (tx) => tx`select jurisdiction, count(*)::int as n from people where status = 'active' group by jurisdiction order by n desc, jurisdiction`);
+  return rows.map((r) => ({ jurisdiction: r.jurisdiction as string, count: Number(r.n) }));
+}

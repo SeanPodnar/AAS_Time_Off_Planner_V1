@@ -15,3 +15,18 @@ export async function resetDb() {
 export function connect(name: "DATABASE_URL_ADMIN" | "DATABASE_URL_APP" | "DATABASE_URL_PLATFORM") {
   return postgres(process.env[name]!, { max: 2, onnotice: () => {} });
 }
+
+/**
+ * A Monday at least a week out with no Ontario holidays for the next nine weeks or the
+ * Friday before: the Monday after the next Thanksgiving (mid-October to mid-December has none).
+ * Request tests use it so holidays never change their day counts.
+ */
+export async function quietMonday(): Promise<string> {
+  const { holidaysFor } = await import("../../src/lib/holidays/rules");
+  const { addDays, todayIn } = await import("../../src/lib/accrual/dates");
+  const today = todayIn("America/Toronto");
+  for (let y = Number(today.slice(0, 4)); ; y++) {
+    const t = holidaysFor("CA-ON", y).find((h) => h.key === "thanksgiving")!.date;
+    if (t > addDays(today, 7)) return addDays(t, 7);
+  }
+}

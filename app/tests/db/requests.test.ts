@@ -1,10 +1,10 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { hasDb, resetDb } from "./helpers";
+import { hasDb, quietMonday, resetDb } from "./helpers";
 import { closeDb } from "@/lib/db";
 import { createTenant } from "@/lib/tenants";
 import { withTenant } from "@/lib/tenancy";
 import { outbox } from "@/lib/mailer";
-import { addDays, todayIn, weekday } from "@/lib/accrual/dates";
+import { addDays, todayIn } from "@/lib/accrual/dates";
 import {
   adjustBalance, adminAddTimeOff, amendRequest, approvalCount, cancelRequest, decideRequest, listApprovals, listMyRequests,
   NotAllowed, previewRequest, submitRequest, type Company,
@@ -12,8 +12,7 @@ import {
 
 // Dates are relative to today so the tests keep working: M is a Monday at least four weeks out.
 const today = todayIn("America/Toronto");
-let M = addDays(today, 28);
-while (weekday(M) !== 1) M = addDays(M, 1);
+let M = "";
 const day = (n: number) => addDays(M, n); // day(-3) is the Friday before M
 
 describe.skipIf(!hasDb)("requests and approvals", () => {
@@ -27,6 +26,7 @@ describe.skipIf(!hasDb)("requests and approvals", () => {
   const vac = (from: string, to: string, extra = {}) => ({ planId: vacation, startDate: from, endDate: to, ...extra });
 
   beforeAll(async () => {
+    M = await quietMonday();
     await resetDb();
     const t = { customDomain: "", brandColor: "#2b6cb0" };
     const a = (await createTenant({ ...t, legalName: "Northwind Analytics Inc.", shortLabel: "Northwind", subdomain: "northwind", country: "CA" }, "t")) as { id: string };
@@ -90,9 +90,11 @@ describe.skipIf(!hasDb)("requests and approvals", () => {
   });
 
   it("blocks overbooking and double booking", async () => {
-    const over = await submitRequest(A, as(maya), vac(day(21), day(28)));
+    // 16 working days is more than Maya can have, whichever plan year these dates fall in
+    // (Ontario keeps her statutory minimum across a year end, so the balance depends on the year).
+    const over = await submitRequest(A, as(maya), vac(day(21), day(42)));
     expect(over.ok).toBe(false);
-    expect((over as { errors: Record<string, string> }).errors.form).toMatch(/Not enough Vacation for this request: 5 days available, 6 needed/);
+    expect((over as { errors: Record<string, string> }).errors.form).toMatch(/Not enough Vacation for this request: [\d.]+ days available, 16 needed/);
     const clash = await submitRequest(A, as(maya), { planId: sick, startDate: day(2), endDate: day(2) });
     expect((clash as { errors: Record<string, string> }).errors.startDate).toMatch(/already have time off/);
   });

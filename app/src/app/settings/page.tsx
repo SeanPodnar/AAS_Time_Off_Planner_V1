@@ -1,5 +1,6 @@
 import { getSettings } from "@/lib/people";
 import { timeZoneChoices } from "@/lib/jurisdictions";
+import Link from "next/link";
 import { requireAdmin } from "@/lib/session";
 import { CompanyHeader, brandStyle } from "../components/CompanyHeader";
 import { SettingsForm } from "./SettingsForm";
@@ -15,6 +16,7 @@ export default async function SettingsPage() {
       <main className="wrap">
         <h1>Company settings</h1>
         <SettingsForm timeZone={s.timeZone} threshold={s.secondApprovalThreshold} reminderAfterDays={s.reminderAfterDays} escalateAfterDays={s.escalateAfterDays} zones={timeZoneChoices()} />
+        <p className="muted small"><Link href="/settings/holidays">Holidays</Link>: see and change the holiday calendar for each province or state.</p>
       </main>
     </div>
   );

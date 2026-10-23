@@ -1,16 +1,15 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { hasDb, resetDb } from "./helpers";
+import { hasDb, quietMonday, resetDb } from "./helpers";
 import { closeDb } from "@/lib/db";
 import { createTenant } from "@/lib/tenants";
 import { withTenant } from "@/lib/tenancy";
 import { outbox } from "@/lib/mailer";
-import { addDays, todayIn, weekday } from "@/lib/accrual/dates";
+import { addDays, todayIn } from "@/lib/accrual/dates";
 import { approvalCount, decideRequest, listApprovals, NotAllowed, submitRequest, type Company } from "@/lib/requests/service";
 import { businessDaysBetween, listBackups, removeBackup, sendFollowUps, setBackup } from "@/lib/requests/followups";
 
 const today = todayIn("America/Toronto");
-let M = addDays(today, 28);
-while (weekday(M) !== 1) M = addDays(M, 1);
+let M = "";
 const day = (n: number) => addDays(M, n);
 const later = (calendarDays: number) => new Date(Date.now() + calendarDays * 86_400_000);
 
@@ -27,6 +26,7 @@ describe.skipIf(!hasDb)("reminders, escalation and backups", () => {
   const as = (personId: string, role: "employee" | "admin" = "employee") => ({ personId, role });
 
   beforeAll(async () => {
+    M = await quietMonday();
     await resetDb();
     const a = (await createTenant({ customDomain: "", brandColor: "#2b6cb0", legalName: "Northwind Analytics Inc.", shortLabel: "Northwind", subdomain: "northwind", country: "CA" }, "t")) as { id: string };
     A = { tenantId: a.id, label: "Northwind", timeZone: "America/Toronto", baseUrl: "http://northwind.localhost:3100" };

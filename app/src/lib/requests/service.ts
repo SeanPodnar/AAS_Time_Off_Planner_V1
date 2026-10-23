@@ -13,6 +13,7 @@ import { NotAllowed, type Actor } from "../people";
 import { addDays, todayIn, type ISODate } from "../accrual/dates";
 import { loadContext, loadRules, postAccruals, type Context } from "../accrual/post";
 import { computeDueRows, planYearStart } from "../accrual/schedule";
+import { holidayDates } from "../holidays";
 import { partsClash, partValue, requestDays, runLength, totalDays, type DayPart, type Part, type Schedule } from "./days";
 
 export { NotAllowed };
@@ -43,10 +44,10 @@ export type Result<T = object> = ({ ok: true } & T) | { ok: false; errors: Error
 
 // Loading ---------------------------------------------------------------------------------
 
-type PersonRow = { id: string; fullName: string; email: string; managerId: string | null; teamId: string | null; hireDate: ISODate; workDays: number[]; hoursPerDay: number; status: string };
+type PersonRow = { id: string; fullName: string; email: string; managerId: string | null; teamId: string | null; hireDate: ISODate; workDays: number[]; hoursPerDay: number; status: string; jurisdiction: string };
 async function person(tx: Tx, id: string): Promise<PersonRow | null> {
-  const [p] = await tx`select id, full_name, email, manager_id, team_id, hire_date, work_days, hours_per_day, status from people where id = ${id}`;
-  return p ? { id: p.id, fullName: p.full_name, email: p.email, managerId: p.manager_id, teamId: p.team_id, hireDate: d(p.hire_date), workDays: p.work_days.map(Number), hoursPerDay: Number(p.hours_per_day), status: p.status } : null;
+  const [p] = await tx`select id, full_name, email, manager_id, team_id, hire_date, work_days, hours_per_day, status, jurisdiction from people where id = ${id}`;
+  return p ? { id: p.id, fullName: p.full_name, email: p.email, managerId: p.manager_id, teamId: p.team_id, hireDate: d(p.hire_date), workDays: p.work_days.map(Number), hoursPerDay: Number(p.hours_per_day), status: p.status, jurisdiction: p.jurisdiction } : null;
 }
 
 type PlanRow = { id: string; name: string; unit: "days" | "hours"; accrualMethod: string; approvalMode: "auto" | "manager" | "admin"; secondApproval: boolean; negativeLimit: number; waitingPeriodDays: number; counts: "working_days" | "calendar_days"; visibility: string; cancelNeedsApproval: boolean; active: boolean };
@@ -64,8 +65,14 @@ async function threshold(tx: Tx) {
   return s ? Number(s.second_approval_threshold) : 10;
 }
 
-// Holidays arrive with FR-41; until then only the person's work days decide working days.
-const scheduleFor = (p: PersonRow): Schedule => ({ workDays: p.workDays, holidays: new Set() });
+/**
+ * The person's work days and holidays (their jurisdiction's defaults with the company's changes)
+ * around a date range. The window reaches a year either side so the run of joined-up time off
+ * sees holidays that sit between bookings.
+ */
+async function scheduleFor(tx: Tx, p: PersonRow, from: ISODate, to: ISODate): Promise<Schedule> {
+  return { workDays: p.workDays, holidays: await holidayDates(tx, p.jurisdiction, addDays(from, -370), addDays(to, 370)) };
+}
 
 /** Live days a person has booked or requested, excluding the given requests. Cancellation requests add no days. */
 async function liveDays(tx: Tx, personId: string, exclude: string[]) {
@@ -148,8 +155,9 @@ async function draft(tx: Tx, company: Company, actor: Actor, personId: string, r
   const earliest = addDays(who.hireDate, p.waitingPeriodDays);
   if (s < earliest) return { errors: { startDate: `This plan can be used from ${earliest}.` } };
 
-  const days = requestDays(scheduleFor(who), s, e, input.startPart, input.endPart, p.counts);
-  if (days.length === 0) return { errors: { startDate: "Those dates have no working days." } };
+  const schedule = await scheduleFor(tx, who, s, e);
+  const days = requestDays(schedule, s, e, input.startPart, input.endPart, p.counts);
+  if (days.length === 0) return { errors: { startDate: "Those dates have no working days (weekends and holidays are not counted)." } };
 
   const exclude = [opts.replacing, opts.editing].filter(Boolean) as string[];
   const others = await liveDays(tx, personId, exclude);
@@ -170,7 +178,7 @@ async function draft(tx: Tx, company: Company, actor: Actor, personId: string, r
     }
   }
 
-  const run = runLength(scheduleFor(who), days.map((x) => x.day), others.map((o) => o.day));
+  const run = runLength(schedule, days.map((x) => x.day), others.map((o) => o.day));
   const limit = await threshold(tx);
   const secondApproval = p.approvalMode === "manager" && p.secondApproval && run > limit;
   const steps = await planSteps(tx, who, p, secondApproval);
@@ -630,7 +638,7 @@ export async function listApprovals(company: Company, actor: Actor): Promise<App
       const who = (await person(tx, r.personId))!;
       const mineDays = (await tx`select day from request_days where request_id = ${r.id}`).map((x) => d(x.day));
       const others = (await liveDays(tx, r.personId, [r.id, ...(r.targetId ? [r.targetId] : [])])).map((x) => x.day);
-      out.push({ ...r, mine: o.approver_id === actor.personId || covering.includes(o.approver_id) || (o.role === "admin" && actor.role === "admin"), coveringFor: covering.includes(o.approver_id) ? o.approver_id : null, stepRole: o.role, ...(() => { const run = runLength(scheduleFor(who), mineDays, others); return { run, longRun: run > limit }; })() });
+      out.push({ ...r, mine: o.approver_id === actor.personId || covering.includes(o.approver_id) || (o.role === "admin" && actor.role === "admin"), coveringFor: covering.includes(o.approver_id) ? o.approver_id : null, stepRole: o.role, ...(await (async () => { const run = runLength(await scheduleFor(tx, who, r.startDate, r.endDate), mineDays, others); return { run, longRun: run > limit }; })()) });
     }
     return out.sort((a, b) => a.startDate.localeCompare(b.startDate));
   });
