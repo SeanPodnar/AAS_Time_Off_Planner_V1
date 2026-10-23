@@ -1,6 +1,6 @@
 ---
 title: "AAS Time Off Planner: Product Requirements Document"
-subtitle: "Version 1.1"
+subtitle: "Version 1.2"
 date: "23 October 2026"
 ---
 
@@ -10,12 +10,12 @@ date: "23 October 2026"
 |---|---|
 | Product | AAS Time Off Planner |
 | Document | Product Requirements Document (PRD) |
-| Version | 1.1 (see change log, section 13) |
+| Version | 1.2 (see change log, section 13) |
 | Date | 23 October 2026 |
 | Owner | Sean, Asensean (platform owner) |
 | Companion | Technical Requirements Document (TRD) v1.0 |
 | Sources | Requirements plan Draft 5 (`docs/PLAN.md`), roadmap board, owner decisions to date |
-| Status of build | Built and merged to `main`: company setup, company data separation, short labels, email sign-in, two-step sign-in, people management, company settings |
+| Status of build | Built and merged to `main`: company setup, company data separation, short labels, email sign-in, two-step sign-in, people management, company settings, bulk import of people |
 
 Requirement IDs (FR-, NFR-) are referenced by the TRD and by the roadmap board. Priorities: **M** must have for v1, **S** should have (v1.1), **C** could have (v1.2 or later).
 
@@ -114,7 +114,7 @@ Rules:
 | ID | Requirement | Pri | Acceptance criteria | Status |
 |---|---|---|---|---|
 | FR-20 | HR admins can add, edit and deactivate people: name, email, job title, team, location, jurisdiction (province or state, and city where a local law applies), start date, primary and secondary managers, role, standard hours per day, work days. | M | A manager must be active and belong to the same company; no one manages themselves; no management loops; at least one active HR admin remains; deactivation signs the person out. | Built (city-level jurisdiction pending) |
-| FR-21 | Bulk import of people and opening balances from CSV or XLSX, with a preview and row-level errors before anything is saved. | M | | In progress (people); opening balances follow the plan engine |
+| FR-21 | Bulk import of people and opening balances from CSV or XLSX, with a preview and row-level errors before anything is saved. | M | | Built for people (CSV or XLSX, preview with row-level problems, matched by email, all-or-nothing); opening balances follow the plan engine |
 | FR-22 | Directory search by name, email, team, manager, location or job title, with active, inactive or all. | M | | Built |
 
 ## 6.4 Plans and accrual
@@ -274,3 +274,4 @@ All reports are HR admin only. Each shows title, company legal name, filters and
 |---|---|---|
 | 1.0 | 23 Oct 2026 | First full scope. |
 | 1.1 | 23 Oct 2026 | D3 and D4 resolved (part-time work weeks and company time zone in v1, both built). FR-06, FR-20 and FR-22 built. FR-21 in progress. Added FR-64, multiple time zones, to v1.1. These documents are now updated after each merged feature. |
+| 1.2 | 23 Oct 2026 | FR-21 bulk import of people built (opening balances follow the plan engine). Added the model delegation rule: simpler work goes to lower AI models and is reviewed; the owner is asked before escalating to a higher model. |
