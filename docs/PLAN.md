@@ -268,7 +268,7 @@ Bradford Factor excluded by default: it penalises short repeated absences and ca
 
 ## 10. Proposed technical stack
 - Next.js (React, TypeScript), responsive web; no native mobile apps in v1.
-- PostgreSQL with RLS; Drizzle ORM (first-class RLS support).
+- PostgreSQL 16 with RLS. Plain SQL migrations and the postgres.js driver (changed from Drizzle during v1: the separation rules are easier to review as SQL).
 - Auth.js (or self-hosted identity server) with Google, Microsoft Entra ID and email link; TOTP MFA.
 - Background jobs for accruals, year-end, feeds, payroll files, calendar pushes.
 - Email and file storage in Canada.
