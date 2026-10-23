@@ -37,21 +37,27 @@ async function loadContexts(tx: Tx, personId?: string): Promise<Context[]> {
     select distinct a.person_id, a.plan_id from plan_assignments a join people p on p.id = a.person_id
      where p.status = 'active' ${personId ? tx`and a.person_id = ${personId}` : tx``}`;
   const out: Context[] = [];
-  for (const { person_id, plan_id } of pairs) {
-    const [p] = await tx`select id, hire_date, jurisdiction, hours_per_day, work_days from people where id = ${person_id}`;
-    const [plan] = await tx`select * from plans where id = ${plan_id}`;
-    const levels = await tx`select id, annual_amount, tenure_tiers from plan_levels where plan_id = ${plan_id}`;
-    const assigns = await tx`select level_id, effective_from, effective_to from plan_assignments where person_id = ${person_id} and plan_id = ${plan_id} order by effective_from`;
-    const ledger = await tx`select effective_date, plan_year, kind, amount, source_key, reason, rule_ref from accrual_ledger where person_id = ${person_id} and plan_id = ${plan_id}`;
-    out.push({
-      person: { id: p.id, hireDate: d(p.hire_date), jurisdiction: p.jurisdiction, hoursPerDay: Number(p.hours_per_day), workDays: p.work_days.map(Number) },
-      plan: toPlan(plan),
-      levels: levels.map((l) => ({ id: l.id, annualAmount: Number(l.annual_amount), tenureTiers: (l.tenure_tiers as { years: number; amount: number }[]).map((t) => ({ years: Number(t.years), amount: Number(t.amount) })) })),
-      assignments: assigns.map((a) => ({ levelId: a.level_id, from: d(a.effective_from), to: a.effective_to ? d(a.effective_to) : null })),
-      existing: ledger.map((r) => ({ effectiveDate: d(r.effective_date), planYear: d(r.plan_year), kind: r.kind, amount: Number(r.amount), sourceKey: r.source_key, reason: r.reason, ruleRef: r.rule_ref })),
-    });
-  }
+  for (const { person_id, plan_id } of pairs) out.push((await loadContext(tx, person_id, plan_id))!);
   return out;
+}
+
+export type { Context };
+
+/** Everything the engine needs for one person and one plan, or null if either is missing. */
+export async function loadContext(tx: Tx, personId: string, planId: string): Promise<Context | null> {
+  const [p] = await tx`select id, hire_date, jurisdiction, hours_per_day, work_days from people where id = ${personId}`;
+  const [plan] = await tx`select * from plans where id = ${planId}`;
+  if (!p || !plan) return null;
+  const levels = await tx`select id, annual_amount, tenure_tiers from plan_levels where plan_id = ${planId}`;
+  const assigns = await tx`select level_id, effective_from, effective_to from plan_assignments where person_id = ${personId} and plan_id = ${planId} order by effective_from`;
+  const ledger = await tx`select effective_date, plan_year, kind, amount, source_key, reason, rule_ref from accrual_ledger where person_id = ${personId} and plan_id = ${planId}`;
+  return {
+    person: { id: p.id, hireDate: d(p.hire_date), jurisdiction: p.jurisdiction, hoursPerDay: Number(p.hours_per_day), workDays: p.work_days.map(Number) },
+    plan: toPlan(plan),
+    levels: levels.map((l) => ({ id: l.id, annualAmount: Number(l.annual_amount), tenureTiers: (l.tenure_tiers as { years: number; amount: number }[]).map((t) => ({ years: Number(t.years), amount: Number(t.amount) })) })),
+    assignments: assigns.map((a) => ({ levelId: a.level_id, from: d(a.effective_from), to: a.effective_to ? d(a.effective_to) : null })),
+    existing: ledger.map((r) => ({ effectiveDate: d(r.effective_date), planYear: d(r.plan_year), kind: r.kind, amount: Number(r.amount), sourceKey: r.source_key, reason: r.reason, ruleRef: r.rule_ref })),
+  };
 }
 
 export type PostResult = { posted: number; warnings: (Warning & { personId: string; planId: string })[] };
