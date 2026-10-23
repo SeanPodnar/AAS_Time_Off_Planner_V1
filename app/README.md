@@ -27,5 +27,10 @@ Next.js (TypeScript) on PostgreSQL 16. See `../docs/PLAN.md` for requirements an
 - Platform owners sign in at the root address with separate tables, cookie and database role.
 - Limits: 5 links per address and 30 per network address every 15 minutes (in memory; moves to shared storage when there is more than one server).
 
+## Two-step sign-in
+- Required for HR admins and the platform owner after the email link: a 6-digit code from an authenticator app (RFC 6238), with 10 one-time recovery codes shown once at set-up.
+- Keys are encrypted with AES-256-GCM using `MFA_ENCRYPTION_KEY` (never stored in the database); recovery codes are stored as hashes. A code can't be used twice, and 5 wrong codes lock the session out for 15 minutes.
+- Employees and managers are not asked for a code yet.
+
 ## Not yet
-Google and Microsoft 365 sign-in, and two-factor codes for HR admins and the platform owner, are the next two branches. Production email (Amazon SES in Canada) comes with the release item.
+Google and Microsoft 365 sign-in is the next branch. Production email (Amazon SES in Canada) comes with the release item.

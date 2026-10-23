@@ -33,6 +33,8 @@ jobs:
       DATABASE_URL_APP: postgres://aas_app:ci-app-password@localhost:5432/aas_test
       DATABASE_URL_PLATFORM: postgres://aas_platform:ci-platform-password@localhost:5432/aas_test
       ROOT_DOMAIN: localhost
+      # Test-only key (all 7s) for the throwaway CI database.
+      MFA_ENCRYPTION_KEY: BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

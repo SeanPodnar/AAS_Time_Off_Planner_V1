@@ -65,17 +65,17 @@ export async function redeemSignInLink(tenantId: string, token: string, userAgen
   });
 }
 
-export type SessionUser = { personId: string; fullName: string; email: string; role: "employee" | "admin"; isManager: boolean };
+export type SessionUser = { personId: string; fullName: string; email: string; role: "employee" | "admin"; isManager: boolean; mfaVerified: boolean };
 
 export async function sessionUser(tenantId: string, token: string | undefined, now = new Date()): Promise<SessionUser | null> {
   if (!looksLikeToken(token)) return null;
   return withTenant(tenantId, async (tx) => {
     const [u] = await tx`
-      select p.id, p.full_name, p.email, p.role,
+      select p.id, p.full_name, p.email, p.role, s.mfa_at is not null as mfa_verified,
              exists (select 1 from people r where r.manager_id = p.id and r.status = 'active') as is_manager
         from sessions s join people p on p.id = s.person_id
        where s.token_hash = ${hashToken(token)} and s.revoked_at is null and s.expires_at > ${now} and p.status = 'active'`;
-    return u ? { personId: u.id, fullName: u.full_name, email: u.email, role: u.role, isManager: u.is_manager } : null;
+    return u ? { personId: u.id, fullName: u.full_name, email: u.email, role: u.role, isManager: u.is_manager, mfaVerified: u.mfa_verified } : null;
   });
 }
 
@@ -124,14 +124,14 @@ export async function redeemPlatformLink(token: string, userAgent: string | null
   }) as Promise<NewSession | null>;
 }
 
-export type PlatformUser = { ownerId: string; fullName: string; email: string };
+export type PlatformUser = { ownerId: string; fullName: string; email: string; mfaVerified: boolean };
 
 export async function platformUser(token: string | undefined, now = new Date()): Promise<PlatformUser | null> {
   if (!looksLikeToken(token)) return null;
   const [o] = await platformDb()`
-    select o.id, o.full_name, o.email from platform_sessions s join platform_owners o on o.id = s.owner_id
+    select o.id, o.full_name, o.email, s.mfa_at is not null as mfa_verified from platform_sessions s join platform_owners o on o.id = s.owner_id
      where s.token_hash = ${hashToken(token)} and s.revoked_at is null and s.expires_at > ${now} and o.active`;
-  return o ? { ownerId: o.id, fullName: o.full_name, email: o.email } : null;
+  return o ? { ownerId: o.id, fullName: o.full_name, email: o.email, mfaVerified: o.mfa_verified } : null;
 }
 
 export async function endPlatformSession(token: string | undefined, now = new Date()) {
