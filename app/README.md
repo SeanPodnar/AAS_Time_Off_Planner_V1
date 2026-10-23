@@ -14,10 +14,18 @@ Next.js (TypeScript) on PostgreSQL 16. See `../docs/PLAN.md` for requirements an
 2. `cp .env.example .env.local` and set the three connection URLs. Use made-up passwords for development.
 3. `npm ci`
 4. `set -a; . ./.env.local; set +a; npm run db:migrate && npm run db:seed` (synthetic sample data only)
-5. `npm run dev`, then open http://localhost:3000/platform and http://northwind.localhost:3000
+5. `npm run dev`, then open http://localhost:3000/platform (sign in as `owner@aas.example`) or http://northwind.localhost:3000 (sign in as `maya@northwind.example`, `daniel@northwind.example`, or `priya@northwind.example` for HR admin). Sign-in emails print in the terminal.
+6. To add a real platform owner: `npm run platform:add-owner -- you@example.com "Your Name"`
 
 ## Checks
 `npm run lint`, `npm run typecheck`, `npm test`, `npm run build`. The database tests need `DATABASE_URL_ADMIN`, `DATABASE_URL_APP` and `DATABASE_URL_PLATFORM` pointing at a throwaway database, which they wipe.
 
+## Sign-in
+- Email sign-in link: single use, 15 minutes, stored only as a SHA-256 hash. The emailed link opens a page with a Continue button, so email scanners that open links cannot use it up.
+- The same "check your email" answer is shown whether or not an address is known.
+- Sessions last 12 hours, use a host-only, HttpOnly cookie (one company's session is never sent to another company's address) and are revoked on sign-out.
+- Platform owners sign in at the root address with separate tables, cookie and database role.
+- Limits: 5 links per address and 30 per network address every 15 minutes (in memory; moves to shared storage when there is more than one server).
+
 ## Not yet
-Sign-in (roadmap item now-03) comes next. Until then the platform console only runs when `ENABLE_DEV_PLATFORM=true` outside production.
+Google and Microsoft 365 sign-in, and two-factor codes for HR admins and the platform owner, are the next two branches. Production email (Amazon SES in Canada) comes with the release item.

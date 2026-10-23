@@ -1,43 +1,38 @@
-import { headers } from "next/headers";
 import Link from "next/link";
-import { notFound } from "next/navigation";
-import { parseHost } from "@/lib/host";
-import { resolveTenant } from "@/lib/tenancy";
 import { brandInk } from "@/lib/color";
-import { devPlatformEnabled } from "@/lib/flags";
+import { currentSite, requireCompanyUser } from "@/lib/session";
+import { signOut } from "./login/actions";
 
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
-  const host = (await headers()).get("host");
-  const tenant = await resolveTenant(host);
-
-  if (!tenant) {
-    // A company address that matches no company gets a plain 404, never another company's page.
-    if (parseHost(host, process.env.ROOT_DOMAIN ?? "localhost").kind !== "root") notFound();
+  const site = await currentSite();
+  if (site.kind === "platform") {
     return (
       <main className="wrap">
         <h1>AAS Time Off Planner</h1>
         <p className="muted">Open your company&apos;s sign-in address to continue.</p>
-        {devPlatformEnabled() && (
-          <p className="small">
-            Development: <Link href="/platform">platform console</Link>
-          </p>
-        )}
+        <p className="small"><Link href="/platform">Platform console</Link></p>
       </main>
     );
   }
 
-  const style = { "--brand": tenant.brandColor, "--brand-ink": brandInk(tenant.brandColor) } as React.CSSProperties;
+  const { user } = await requireCompanyUser();
+  const t = site.tenant;
+  const style = { "--brand": t.brandColor, "--brand-ink": brandInk(t.brandColor) } as React.CSSProperties;
+  const role = user.role === "admin" ? "HR admin" : user.isManager ? "Manager" : "Employee";
   return (
     <div style={style}>
       <header className="top">
-        <span className="mark" aria-hidden="true">{tenant.shortLabel.slice(0, 2).toUpperCase()}</span>
-        <strong>{tenant.shortLabel}</strong>
+        <span className="mark" aria-hidden="true">{t.shortLabel.slice(0, 2).toUpperCase()}</span>
+        <strong>{t.shortLabel}</strong>
+        <span style={{ flex: 1 }} />
+        <span className="small">{user.fullName} · {role}</span>
+        <form action={signOut}><button className="btn" type="submit">Sign out</button></form>
       </header>
       <main className="wrap">
-        <h1>{tenant.shortLabel} time off</h1>
-        <p className="muted">Sign-in with Google, Microsoft 365 or an email link arrives in the next update.</p>
+        <h1>{t.shortLabel} time off</h1>
+        <p className="muted">You&apos;re signed in. Balances and requests arrive with the next roadmap items.</p>
       </main>
     </div>
   );
