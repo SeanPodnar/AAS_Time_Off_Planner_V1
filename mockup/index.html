@@ -300,7 +300,8 @@ for (const t of TENANTS){
 }
 
 /* ---------- state ---------- */
-const S = { tenant:"nw", role:"employee", view:"home", platformVisit:false, calMonth:"2026-10", calScope:"team", selPerson:null, selPlan:null, report:null, sort:{}, filters:{}, modal:null };
+let savedTheme = null; try { savedTheme = localStorage.getItem("aas-theme"); } catch(e){}
+const S = { theme: savedTheme || "dark", tenant:"nw", role:"employee", view:"home", platformVisit:false, calMonth:"2026-10", calScope:"team", selPerson:null, selPlan:null, report:null, sort:{}, filters:{}, modal:null };
 const T = () => TENANTS.find(t=>t.id===S.tenant);
 const P = id => T().people.find(p=>p.id===id);
 const PL = id => T().plans.find(p=>p.id===id);
@@ -402,6 +403,7 @@ function log(what){ const n = new Date(); const at = `${TODAY} ${String(n.getHou
 function hexToRgb(h){ const m = h.replace("#",""); return [0,2,4].map(i=>parseInt(m.slice(i,i+2),16)); }
 function lum(h){ return hexToRgb(h).map(v=>{v/=255;return v<=.03928?v/12.92:Math.pow((v+.055)/1.055,2.4)}).reduce((a,v,i)=>a+v*[.2126,.7152,.0722][i],0); }
 function contrast(a,b){ const [x,y]=[lum(a),lum(b)].sort((m,n)=>n-m); return (x+.05)/(y+.05); }
+function applyTheme(){ const r=document.documentElement; if (S.theme==="device") r.removeAttribute("data-theme"); else r.setAttribute("data-theme", S.theme); }
 function applyBrand(){ const t=T(); document.documentElement.style.setProperty("--brand",t.brand); document.documentElement.style.setProperty("--brand-ink", contrast(t.brand,"#ffffff")>=3 ? "#ffffff" : "#0d1b2e"); }
 
 /* ---------- top + nav ---------- */
@@ -416,6 +418,7 @@ function renderTop(){
     <div class="spacer"></div>
     <div class="row"><span class="seglabel">View as</span><div class="seg" role="group" aria-label="Prototype role">${ROLES.map(([k,l])=>`<button data-act="role" data-v="${k}" aria-pressed="${(S.role===k && !S.platformVisit) || (k==="platform"&&S.platformVisit)}">${l}</button>`).join("")}</div></div>
     ${!inPlatform && !S.platformVisit ? `<div class="row"><span class="seglabel">Company</span><div class="seg" role="group" aria-label="Sample company">${TENANTS.map(x=>`<button data-act="tenant" data-v="${x.id}" aria-pressed="${x.id===S.tenant}">${esc(x.short)}</button>`).join("")}</div></div>`:""}
+    <div class="row"><span class="seglabel">Theme</span><div class="seg" role="group" aria-label="Colour theme">${[["dark","Dark"],["light","Light"],["device","Match device"]].map(([k,l])=>`<button data-act="theme" data-v="${k}" aria-pressed="${S.theme===k}">${l}</button>`).join("")}</div></div>
     <div class="who"><span class="avatar">${initials(persona.name)}</span><span>${esc(persona.name)}</span></div>`;
 }
 function navItems(){
@@ -799,7 +802,7 @@ function renderModal(){
 
 /* ---------- render ---------- */
 function render(){
-  applyBrand(); renderTop(); renderNav();
+  applyTheme(); applyBrand(); renderTop(); renderNav();
   const v = {home:viewHome,team:viewTeam,approvals:viewApprovals,calendar:viewCalendar,sync:viewSync,people:viewPeople,plans:viewPlans,reports:viewReports,integrations:viewIntegrations,branding:viewBranding,audit:viewAudit,tenants:viewTenants}[S.view] || viewHome;
   const focusId=document.activeElement?.id, selStart=document.activeElement?.selectionStart;
   document.getElementById("main").innerHTML = v();
@@ -900,6 +903,7 @@ document.addEventListener("click", e => {
     case "submitReq": submitReq(); return;
     case "decide": decide(v, el.dataset.d); return;
     case "calScope": S.calScope=v; break;
+    case "theme": S.theme=v; try { localStorage.setItem("aas-theme", v); } catch(e){} toast(v==="device"?"Theme now follows your device setting.":`${v==="dark"?"Dark":"Light"} mode on.`); break;
     case "cal": S.calMonth=v; break;
     case "copy": { const inp=document.getElementById(v); navigator.clipboard?.writeText(inp.value).then(()=>toast("Link copied."),()=>{inp.select();toast("Press Ctrl+C or Cmd+C to copy.");}); return; }
     case "toast": toast(v); return;
