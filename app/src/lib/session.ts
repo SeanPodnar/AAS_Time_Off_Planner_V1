@@ -63,3 +63,10 @@ export async function requirePlatformOwner(opts: Opts = {}): Promise<PlatformUse
   if (!opts.allowPendingMfa && !owner.mfaVerified) redirect("/mfa");
   return { ...owner, token };
 }
+
+/** HR admin pages: signed in, two-step verified, admin role. Others get a 404 so the page's existence isn't revealed. */
+export async function requireAdmin() {
+  const ctx = await requireCompanyUser();
+  if (ctx.user.role !== "admin") notFound();
+  return { ...ctx, actor: { personId: ctx.user.personId, role: ctx.user.role } as const };
+}
