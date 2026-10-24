@@ -1,6 +1,6 @@
 ---
 title: "AAS Time Off Planner: Product Requirements Document"
-subtitle: "Version 1.3"
+subtitle: "Version 1.4"
 date: "23 October 2026"
 ---
 
@@ -10,12 +10,12 @@ date: "23 October 2026"
 |---|---|
 | Product | AAS Time Off Planner |
 | Document | Product Requirements Document (PRD) |
-| Version | 1.3 (see change log, section 13) |
+| Version | 1.4 (see change log, section 13) |
 | Date | 23 October 2026 |
 | Owner | Sean, Asensean (platform owner) |
-| Companion | Technical Requirements Document (TRD) v1.3 |
+| Companion | Technical Requirements Document (TRD) v1.4 |
 | Sources | Requirements plan Draft 5 (`docs/PLAN.md`), roadmap board, owner decisions to date |
-| Status of build | Built and merged to `main`: company setup, company data separation, short labels, email sign-in, two-step sign-in, people management, company settings, bulk import of people, time off plans with levels and assignments, accrual engine and balances |
+| Status of build | Built and merged to `main`: company setup, company data separation, short labels, email sign-in, two-step sign-in, people management, company settings, bulk import of people, time off plans with levels and assignments, accrual engine and balances, requests and approvals with reminders and backup approvers, public holidays, team calendar and calendar feed links (in review), reports with Excel and CSV export (in review) |
 
 Requirement IDs (FR-, NFR-) are referenced by the TRD and by the roadmap board. Priorities: **M** must have for v1, **S** should have (v1.1), **C** could have (v1.2 or later).
 
@@ -124,58 +124,58 @@ Rules:
 | FR-30 | Unlimited admin-defined plans (starter templates: Vacation, Wellbeing, Sick, Personal, Bereavement, Parental, Unpaid, Lieu). | M |  | Built (starter templates: Vacation, Wellbeing, Sick, Personal, Unpaid; all nine categories available) |
 | FR-31 | Plan levels: each plan can have levels with their own days per year; each person has one level per plan; a mid-year level change prorates the rest of the plan year. | M |  | Built |
 | FR-32 | Plan year starts on any date (default 1 January), set per plan. | M |  | Built (day 1 to 28 of any month) |
-| FR-33 | Units: days and half days (default) or hours. Requests are always in days and half days; hours plans deduct the person's standard hours per day. | M |  | Partly built (days or hours per plan; deduction comes with requests) |
-| FR-34 | Accrual methods: lump sum (at plan year start, on hire, or on anniversary), periodic (annual, semi-annual, quarterly, monthly; credited at period start, or end if chosen), per hours worked (salaried staff on their standard week), manual grants with reason. | M |  | Built except manual grants (ledger supports adjustments; screen pending) |
+| FR-33 | Units: days and half days (default) or hours. Requests are always in days and half days; hours plans deduct the person's standard hours per day. | M |  | Built (hours plans deduct the person's standard hours per day) |
+| FR-34 | Accrual methods: lump sum (at plan year start, on hire, or on anniversary), periodic (annual, semi-annual, quarterly, monthly; credited at period start, or end if chosen), per hours worked (salaried staff on their standard week), manual grants with reason. | M |  | Built (manual grants are balance adjustments, FR-57) |
 | FR-35 | First year prorated from the start date by remaining months (start month counts if on or before the 15th), rounded to the nearest half day; configurable per plan. | M | 15 days, start 10 June: 8.75 rounds to 9.0. | Built |
 | FR-36 | Year end per plan: no carryover, capped carryover with optional expiry date, unlimited, or maximum balance cap; payout flag for reporting. | M |  | Built (payout flag stored; payout report pending) |
 | FR-37 | Jurisdiction overrides apply automatically at year end (for example, no forfeiture of earned vacation in California, Colorado, Montana and Nebraska; statutory vacation in Canada cannot simply expire). Each override is shown in the year-end preview and the audit log. | M |  | Built in the engine (overrides are ledger rows naming the rule); year-end preview pending |
 | FR-38 | Statutory minimum table by province and state and years of service. Warnings on plan save, ahead of service anniversaries, and in a compliance report. The app warns; it does not block. | M |  | Partly built (table seeded, marked unverified pending legal review; warnings on the admin's person page; plan-save warning and compliance report pending) |
 | FR-39 | Tenure increases per plan, off by default. | M |  | Built |
-| FR-40 | Other plan settings: approval mode, negative balance limit, waiting period, coworker visibility (plan name, Out of office, hidden), calendar status, working days or calendar days, tracked only. | M |  | Stored; enforced when requests are built |
-| FR-41 | Holiday calendars per province and state, preloaded and editable, plus company holidays. | M |  | Pending |
+| FR-40 | Other plan settings: approval mode, negative balance limit, waiting period, coworker visibility (plan name, Out of office, hidden), calendar status, working days or calendar days, tracked only. | M |  | Built (enforced on every request) |
+| FR-41 | Holiday calendars per province and state, preloaded and editable, plus company holidays. | M |  | Built (all provinces and territories, US federal list, company holidays; marked unverified pending legal review) |
 | FR-42 | Balance projection to plan year end and to any future date. | M |  | Partly built (projection to plan year end; any future date pending) |
 | FR-43 | A plan's unit, earning method, plan year start, lump sum timing and frequency cannot change once the plan has balances; the admin creates a new plan instead. | M | Saving such a change shows a message on the field. | Built |
 
 ## 6.5 Requests and approvals
 
-| ID | Requirement | Pri | Acceptance criteria |
-|---|---|---|---|
-| FR-50 | Request form: plan (only assigned plans), first and last day, half day on first or last day, comment. Live summary: working days after weekends and holidays, balance after, overlap with own requests, team members already off, who approves. | M | |
-| FR-51 | Approval mode per plan: automatic, primary manager, or HR admin. | M | |
-| FR-52 | Second approval: when an absence runs more than 10 working days in a row, the primary manager's own manager also approves (falls back to HR admin). The run counts joined-up bookings in any plan; weekends and holidays do not break it. Threshold set per company; can be turned off per plan. | M | Friday wellbeing day plus two weeks vacation = 11 days, two approvals. |
-| FR-53 | Amend: pending requests edit freely; changes to approved time off go back through approval while the original dates stay booked. | M | |
-| FR-54 | Cancel: pending cancels at once; approved future time needs approval (per plan); past time admin only. | M | |
-| FR-55 | Decline needs a comment. Reminders for pending approvals, then escalation to HR. Backup approver for a date range. | M | |
-| FR-56 | HR admins can add or amend time off for anyone with a required reason, optionally approved immediately and optionally overriding the negative balance limit; logged. | M | |
-| FR-57 | Balance adjustments (credit or debit) with reason and effective date; logged. | M | |
+| ID | Requirement | Pri | Acceptance criteria | Status |
+|---|---|---|---|---|
+| FR-50 | Request form: plan (only assigned plans), first and last day, half day on first or last day, comment. Live summary: working days after weekends and holidays, balance after, overlap with own requests, team members already off, who approves. | M | | Built (overlaps are blocked rather than warned) |
+| FR-51 | Approval mode per plan: automatic, primary manager, or HR admin. | M | | Built |
+| FR-52 | Second approval: when an absence runs more than 10 working days in a row, the primary manager's own manager also approves (falls back to HR admin). The run counts joined-up bookings in any plan; weekends and holidays do not break it. Threshold set per company; can be turned off per plan. | M | Friday wellbeing day plus two weeks vacation = 11 days, two approvals. | Built (automatic and HR-approved plans have no second step) |
+| FR-53 | Amend: pending requests edit freely; changes to approved time off go back through approval while the original dates stay booked. | M | | Built |
+| FR-54 | Cancel: pending cancels at once; approved future time needs approval (per plan); past time admin only. | M | | Built (per-plan setting, on by default) |
+| FR-55 | Decline needs a comment. Reminders for pending approvals, then escalation to HR. Backup approver for a date range. | M | | Built (reminder after 2 business days, HR told after 5, both set per company) |
+| FR-56 | HR admins can add or amend time off for anyone with a required reason, optionally approved immediately and optionally overriding the negative balance limit; logged. | M | | Partly built (HR can add time off for anyone; editing someone's existing request from their page is pending) |
+| FR-57 | Balance adjustments (credit or debit) with reason and effective date; logged. | M | | Built |
 
 ## 6.6 Calendars
 
-| ID | Requirement | Pri |
-|---|---|---|
-| FR-60 | Team calendar (wallchart and month grid) with filters by team, location and plan. Coworkers see the plan name, "Out of office", or nothing, by plan setting; managers see types for their reports; HR sees all. | M |
-| FR-61 | Private, resettable calendar feed links (ICS) for each person and each team, for Google, Outlook and Apple. Names and dates only; no comments or balances. | M |
-| FR-62 | Direct Google Calendar and Microsoft 365 connection (events within seconds; optional Outlook out-of-office). | S |
-| FR-63 | Dark and light mode switch, dark by default, saved per person. | S |
-| FR-64 | Multiple time zones. Each person has a home time zone (default: company time zone). Requests are recorded against the requester's home time zone: dates, "today", past and future rules, half days, deadlines and escalations use it. Managers, HR and teammates see requests localized to their own zone, with the requester's zone shown when it differs. Calendar entries, reminders and notifications go out in each recipient's zone; reminders at a sensible local hour. Reports state the time zone in the run label. | S |
+| ID | Requirement | Pri | Status |
+|---|---|---|---|
+| FR-60 | Team calendar (wallchart and month grid) with filters by team, location and plan. Coworkers see the plan name, "Out of office", or nothing, by plan setting; managers see types for their reports; HR sees all. | M | Built, in review (week grid of 2 to 6 weeks; a month view is pending) |
+| FR-61 | Private, resettable calendar feed links (ICS) for each person and each team, for Google, Outlook and Apple. Names and dates only; no comments or balances. | M | Built, in review (my time off, my team, people I manage) |
+| FR-62 | Direct Google Calendar and Microsoft 365 connection (events within seconds; optional Outlook out-of-office). | S | Planned (v1.1) |
+| FR-63 | Dark and light mode switch, dark by default, saved per person. | S | Planned (v1.1) |
+| FR-64 | Multiple time zones. Each person has a home time zone (default: company time zone). Requests are recorded against the requester's home time zone: dates, "today", past and future rules, half days, deadlines and escalations use it. Managers, HR and teammates see requests localized to their own zone, with the requester's zone shown when it differs. Calendar entries, reminders and notifications go out in each recipient's zone; reminders at a sensible local hour. Reports state the time zone in the run label. | S | Planned (v1.1) |
 
 ## 6.7 Reports and exports
 
 All reports are HR admin only. Each shows title, company legal name, filters and a "Run on <date, time, time zone> by <name>" label on screen and in every export, with sortable columns, filters, plain labels with units and a totals row.
 
-| ID | Report | Pri |
-|---|---|---|
-| FR-70 | Who's out (today, week, range) | M |
-| FR-71 | Balance summary with projection | M |
-| FR-72 | Year-end forfeiture preview (30 days before year end, with overrides) | M |
-| FR-73 | Absence rate and days lost | M |
-| FR-74 | Approval metrics | M |
-| FR-75 | Untaken leave liability in hours | M |
-| FR-76 | Compliance (below a minimum now or within 90 days) | M |
-| FR-77 | Audit report | M |
-| FR-78 | Utilisation; payroll reconciliation | S |
-| FR-79 | XLSX and CSV export of every report (run label, frozen header, filters on) | M |
-| FR-80 | Liability in dollars from an admin-only salary table; finance role; Google Sheets export | C |
+| ID | Report | Pri | Status |
+|---|---|---|---|
+| FR-70 | Who's out (today, week, range) | M | Built, in review |
+| FR-71 | Balance summary with projection | M | Built, in review |
+| FR-72 | Year-end forfeiture preview (30 days before year end, with overrides) | M | Built, in review |
+| FR-73 | Absence rate and days lost | M | Built, in review |
+| FR-74 | Approval metrics | M | Built, in review |
+| FR-75 | Untaken leave liability in hours | M | Built, in review |
+| FR-76 | Compliance (below a minimum now or within 90 days) | M | Built, in review |
+| FR-77 | Audit report | M | Built, in review |
+| FR-78 | Utilisation; payroll reconciliation | S | Planned (v1.1) |
+| FR-79 | XLSX and CSV export of every report (run label, frozen header, filters on) | M | Built, in review |
+| FR-80 | Liability in dollars from an admin-only salary table; finance role; Google Sheets export | C | Backlog |
 
 ## 6.8 Integrations
 
@@ -190,9 +190,10 @@ All reports are HR admin only. Each shows title, company legal name, filters and
 
 ## 6.9 Notifications
 
-| ID | Requirement | Pri |
-|---|---|---|
-| FR-100 | Email for: request submitted, needs your approval, approved, declined, changed, cancelled, reminder, second approval needed, year-end preview, statutory warning. Subjects start with the company short label. Private plan names never appear in emails to anyone but the person, their approvers and HR. | M |
+| ID | Requirement | Pri | Status |
+|---|---|---|---|
+| FR-100 | Email for: request submitted, needs your approval, approved, declined, changed, cancelled, reminder, second approval needed, year-end preview, statutory warning. Subjects start with the company short label. Private plan names never appear in emails to anyone but the person, their approvers and HR. | M | Partly built (submitted, needs approval, second approval, approved, declined, booked or changed by HR, reminders and escalation; year-end preview and statutory warning emails pending) |
+| FR-101 | Reminders of upcoming time off to the person and their manager, by email and in calendar feeds. On by default at 5 days and 1 day before; each person can turn them off or change the timing. | M | Pending |
 
 ## 6.10 Audit
 
@@ -257,6 +258,7 @@ All reports are HR admin only. Each shows title, company legal name, filters and
 | D7 | Legal reviewer for statutory tables | Before release (statutory figures are in the app, marked unverified) |
 | D8 | Should employees and managers also be offered (optional) two-step sign-in? | Before release |
 | D9 | Release budget for Canadian hosting (estimate in TRD) | Release |
+| D10 | Defaults chosen during the build, to confirm: automatic and HR-approved plans skip the second approval; cancelling approved future time needs approval unless a plan turns it off; Quebec observes Good Friday (HR can switch to Easter Monday); US companies start with all 11 federal holidays; Canadian statutory protection at year end counts carried days toward the minimum | Before release |
 
 # 12. Glossary
 
@@ -277,3 +279,4 @@ All reports are HR admin only. Each shows title, company legal name, filters and
 | 1.1 | 23 Oct 2026 | D3 and D4 resolved (part-time work weeks and company time zone in v1, both built). FR-06, FR-20 and FR-22 built. FR-21 in progress. Added FR-64, multiple time zones, to v1.1. These documents are now updated after each merged feature. |
 | 1.2 | 23 Oct 2026 | FR-21 bulk import of people built (opening balances follow the plan engine). Added the model delegation rule: simpler work goes to lower AI models and is reviewed; the owner is asked before escalating to a higher model. |
 | 1.3 | 23 Oct 2026 | FR-30 to FR-42 status added: plans, levels, assignments, accrual engine, year-end carryover and expiry, jurisdiction overrides and balances built. Added FR-43 (plan settings lock once balances exist). Backlog: persona demo videos with captions, guided in-app help, French interface for Quebec as a future item (no Quebec companies or staff today). |
+| 1.4 | 24 Oct 2026 | Status added for FR-50 to FR-57, FR-60 to FR-64, FR-70 to FR-80 and FR-100. Requests and approvals, reminders, escalation and backup approvers built; holidays built; team calendar, calendar feeds and reports built and in review. Added FR-101 (reminders of upcoming time off). Added D10 (defaults to confirm). |

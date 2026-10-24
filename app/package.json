@@ -22,6 +22,7 @@
     "jobs": "tsx scripts/nightly.ts"
   },
   "dependencies": {
+    "fflate": "0.8.3",
     "next": "15.5.28",
     "postgres": "3.4.9",
     "qrcode": "1.5.4",
