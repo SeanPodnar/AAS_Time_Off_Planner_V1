@@ -1,6 +1,6 @@
 ---
 title: "AAS Time Off Planner: Technical Requirements Document"
-subtitle: "Version 1.3"
+subtitle: "Version 1.4"
 date: "23 October 2026"
 ---
 
@@ -9,11 +9,11 @@ date: "23 October 2026"
 | Item | Detail |
 |---|---|
 | Document | Technical Requirements Document (TRD) |
-| Version | 1.3 (see change log, section 22) |
+| Version | 1.4 (see change log, section 22) |
 | Date | 23 October 2026 |
-| Companion | Product Requirements Document (PRD) v1.3; requirement IDs FR- and NFR- refer to it |
+| Companion | Product Requirements Document (PRD) v1.4; requirement IDs FR- and NFR- refer to it |
 | Code | `github.com/SeanPodnar/AAS_Time_Off_Planner_V1`, folder `app/` |
-| Built so far | Migrations 001 to 006: companies, people, audit log, company data separation, email sign-in, sessions, roles, platform owner sign-in, two-step sign-in, people management, company settings, bulk import of people, time off plans, accrual ledger, statutory reference rules, balances. 124 automated tests. |
+| Built so far | Migrations 001 to 011: companies, people, audit log, company data separation, email sign-in, sessions, roles, platform owner sign-in, two-step sign-in, people management, company settings, bulk import of people, time off plans, accrual ledger, statutory reference rules, balances, requests and approvals, reminders and backup approvers, public holidays, team calendar and calendar feeds, reports and exports. 191 automated tests. |
 
 # 2. Architecture
 
@@ -80,7 +80,7 @@ UUID keys everywhere (no shared sequences), no cross-company foreign keys, files
 
 # 5. Data model
 
-## 5.1 Built (migrations 001 to 006)
+## 5.1 Built (migrations 001 to 011)
 
 | Table | Purpose | Key columns |
 |---|---|---|
@@ -99,15 +99,20 @@ UUID keys everywhere (no shared sequences), no cross-company foreign keys, files
 | `plan_assignments` | One level per person per plan at a time | effective_from, effective_to (exclusive, null for open) |
 | `accrual_ledger` | Every balance movement | effective_date, plan_year, kind, amount, unique source_key per company, reason, rule_ref. Append-only: the app role has select and insert only |
 | `jurisdiction_rules` | Statutory reference data, not company data (no tenant_id) | jurisdiction, rule kind (min_entitlement, no_forfeit, forfeit_conditional), years of service, amount in weeks, effective_from, verified flag |
+| `requests` | One ask: new time off, a change to approved time off, or a cancellation | kind, target_id, start and end date with part (full, am, pm), days, amount in the plan unit, status, requester_time_zone, admin_reason |
+| `request_days` | Each counted day of a request | day, part (full, am, pm) |
+| `approval_steps` | Each approval step | step_no, role (manager, next_manager, admin), approver_id, status, override, pending_since, reminded_at, escalated_at |
+| `approval_backups` | Backup approver for a date range | approver_id, backup_id, start_date, end_date |
+| `company_holidays` | Company changes to the default holidays | day, action (add or skip), name, jurisdiction (null for everyone), reason |
+| `calendar_feeds` | Private calendar feed links | scope (me, team, reports), SHA-256 token hash, revoked_at, last_used_at |
+
+`tenant_settings` gained reminder_after_days and escalate_after_days (migration 008); `plans` gained cancel_needs_approval (migration 007). Migration 011 adds `current_tenant_legal_name()`, which returns only the current company's legal name for reports.
 
 ## 5.2 Planned for v1
 
 | Table | Purpose |
 |---|---|
 | `tenant_settings` (more columns) | Retention, sign-in methods allowed, allowed email domains |
-| `holidays` | Per jurisdiction and per company |
-| `requests`, `request_days`, `approval_steps` | Requests, the working days they cover (with half days), and each approval step. Each request stores the requester's time zone at the time of request (`requester_time_zone`), the company zone in v1, so v1.1 home time zones need no data conversion. |
-| `calendar_feeds` | Hashed feed tokens per person and team |
 | `payroll_exports`, `payroll_codes` | Pay period files and plan to WorkLinks code mapping |
 | `notifications_outbox` | Emails queued in the same transaction as the change that caused them |
 | `jobs` | Background job queue (Postgres `SKIP LOCKED`) |
@@ -159,15 +164,18 @@ RFC 6238 codes (SHA-1, 6 digits, 30 seconds, one step of drift either way), veri
 
 # 9. Approval workflow (FR-50 to FR-57)
 
-- On submit or change, the server computes the run: the request plus the person's live bookings (any plan, approved or pending) that touch it with no working day between. If the run exceeds the company threshold and the plan has a second step, steps are primary manager then next-level manager, falling back to HR admin.
-- Steps are rows in `approval_steps` with status waiting, pending, approved or declined. Only the current step's approver (or an HR admin, logged as override) can decide.
-- Change requests keep the original booking in force until approved; cancellation of approved future time follows the plan's setting.
-- All writes for one decision (step, request status, ledger booking, notification outbox, audit entry) happen in one transaction.
-- Reminder job: 2 business days pending sends a reminder; 5 escalates to HR (configurable).
+- Built in `app/src/lib/requests/`: `days.ts` (pure day counting and the run of joined-up time off), `service.ts` (preview, submit, amend, cancel, decide, HR entry, balance adjustments, lists), `followups.ts` (reminders, escalation, backup approvers).
+- The run counts the working days of the request plus every live booking joined to it (any plan, approved or pending), where weekends and holidays don't break it. If it exceeds the company threshold and the plan is manager-approved with a second step, steps are the primary manager then that manager's manager, falling back to HR. Automatic plans approve at once; HR-approved plans have one HR step.
+- Steps are rows in `approval_steps` (waiting, pending, approved, declined, cancelled). The current step's approver, or their active backup, decides; an HR admin can decide any step, logged as an override. Nobody decides their own request. Decline needs a comment.
+- Approval writes a booking row to `accrual_ledger` for each plan year the request touches; a change or cancellation writes a booking_reversal. A change to approved time keeps the original booked until the change is approved. Pending requests count against what is available, and writes for one person are serialised with a row lock so two requests can't both pass the balance check.
+- Each decision (steps, request status, ledger rows, audit entry) is one transaction; emails go out after it commits.
+- The scheduled job (`npm run jobs`, `scripts/nightly.ts`) posts accruals and then sends follow-ups for every company: one reminder after `reminder_after_days` business days and one HR escalation after `escalate_after_days`, each at most once per step. It is safe to run hourly.
 
 # 10. Calendars
 
-- ICS feeds (v1): one hashed token per person and per team, resettable. Events carry name, dates, half-day marker and status (Busy, Free, Out of office). Private plans show "Out of office". Feeds set `Cache-Control: private` and an ETag; refresh timing is controlled by the calendar app.
+- Built in `app/src/lib/calendar/`: `visibility.ts` holds the rules. The person, HR and managers (any level up, and secondary managers) see plan names and pending time; coworkers see approved time only, as the plan allows (plan name, "Out of office", or nothing).
+- Team calendar (`/calendar`): a week grid of 2 to 6 weeks with filters; a plan filter never reveals a plan the viewer can't see.
+- ICS feeds (`/feeds/<token>.ics`): scopes me, team and reports. Feeds never show more than a coworker sees, never show a private plan's name (even in the person's own feed) and never include comments. Tokens are 256-bit random values stored as SHA-256 hashes; a new link revokes the old one; unknown, revoked, other-company and inactive-owner links all return 404. Responses are `Cache-Control: private, no-store`.
 - Direct push (v1.1): per-person OAuth to Google Calendar API and Microsoft Graph; events written from the outbox within seconds; tokens encrypted like two-step keys.
 
 ## 10.1 Time zones
@@ -188,9 +196,10 @@ RFC 6238 codes (SHA-1, 6 digits, 30 seconds, one step of drift either way), veri
 
 # 12. Reports and exports
 
-- Server-side queries over the ledger and requests, always inside `withTenant`; HR admin only.
-- XLSX via a streaming writer with the run label in the first rows, frozen header, auto-filter, number formats with units. CSV in UTF-8 with BOM for Excel.
-- Every export writes an audit entry with filters used.
+- Built in `app/src/lib/reports/`: one `Report` shape (title, company legal name, run label, filters in words, typed columns with units, rows, totals, notes) drives the screen, the Excel file and the CSV.
+- Balance reports (balance summary, liability in hours, year-end preview, compliance) use the accrual engine, so they match the balances on screen. Activity reports (who's out, absence rate, approval metrics, audit) query requests, approval steps and the audit log.
+- Excel files are written directly as Office Open XML and zipped with `fflate`: run label and filters first, header row frozen, auto-filter on, real dates and percents. CSV is UTF-8 with a byte-order mark; text starting with = + - @ is prefixed so it can't run as a formula.
+- HR admin only, every query inside `withTenant`; every export writes an audit entry with its filters; downloads are `Cache-Control: private, no-store`.
 
 # 13. Email
 
@@ -212,6 +221,9 @@ RFC 6238 codes (SHA-1, 6 digits, 30 seconds, one step of drift either way), veri
 | Secrets in AWS Secrets Manager; no secrets in the repository | Planned for release (development uses throwaway values) |
 | Encryption at rest (RDS, S3) and TLS 1.2+ everywhere | Planned for release |
 | Audit log append-only, including platform owner visits | Built (visits pending) |
+| Calendar feed tokens stored as SHA-256 hashes, revocable, rate limited | Built |
+| Spreadsheet formula injection guard on CSV and Excel exports | Built |
+| Server actions act only on an explicit button choice (no default to approve or replace) | Built |
 | Penetration test and review against OWASP ASVS level 2 before real data | Planned (board item) |
 
 # 15. Hosting, environments and cost
@@ -257,17 +269,21 @@ Structured logs without personal data beyond ids; error tracking hosted in Canad
 | `X-Forwarded-Host` trusted | Load balancer must overwrite the header; documented in deployment checklist |
 | Branch protection not enforced | GitHub Pro |
 | Two-step not offered to employees | Decision D8 |
-| Accruals post when a balance is viewed, not nightly | Nightly job per company with requests and approvals |
+| Scheduled jobs run from a script; nothing schedules them yet | Run `npm run jobs` hourly from the host's scheduler at release |
 | Changing a level's amount or a plan's carryover rule applies from the next posting only; rows already posted are not recalculated | Admin adjustment screen; recalculation preview later |
 | Inactive people are skipped by posting | Revisit with offboarding and payout reports |
 | Canadian statutory protection counts carried days toward the minimum (the reading less generous to employees) | Confirm with the legal reviewer (PRD D7) |
+| Feed rate limit is in memory | Move with the other rate limits |
+| A pending change to approved time is not shown on the calendar (the approved original is) | Show pending changes to managers later |
+| Changing company holidays doesn't recount requests already booked | Recount tool for HR later |
+| Audit report shows at most 5000 rows per run | Narrow the date range or export in parts |
 
 # 20. Open technical decisions
 
 | # | Decision | Recommendation |
 |---|---|---|
 | T1 | App hosting on AWS: ECS Fargate or App Runner | App Runner for simplicity if available in Canada (Central) at release; otherwise Fargate |
-| T2 | Background jobs: Postgres queue or a managed queue | Postgres `SKIP LOCKED` queue (one less service) |
+| T2 | ~~Background jobs: Postgres queue or a managed queue~~ | Resolved for v1: an idempotent scheduled script run hourly; a queue only if jobs grow |
 | T3 | Error tracking with Canadian residency | Self-hosted or a vendor with a Canadian region |
 | T4 | ~~Work schedules for part-time staff~~ | Resolved: built as `people.work_days` and `people.hours_per_day` |
 | T5 | ~~Company time zone~~ | Resolved: built as `tenant_settings.time_zone`; per-person zone in v1.1 (section 10.1) |
@@ -279,12 +295,12 @@ Structured logs without personal data beyond ids; error tracking hosted in Canad
 | FR-01 to FR-06 | 4, 5, 6 |
 | FR-10 to FR-15 | 7 |
 | FR-20 to FR-22 | 5.2 |
-| FR-30 to FR-43 | 5.1, 8 |
-| FR-50 to FR-57 | 9 |
-| FR-60 to FR-64 | 10, 10.1 |
+| FR-30 to FR-43 | 5.1, 8 (FR-41: `app/src/lib/holidays/`) |
+| FR-50 to FR-57 | 5.1, 9 |
+| FR-60 to FR-64 | 5.1, 10, 10.1 |
 | FR-70 to FR-80 | 12 |
 | FR-90 to FR-95 | 11 |
-| FR-100 | 13 |
+| FR-100, FR-101 | 9, 13 |
 | FR-110 | 4, 14 |
 | NFR-01 to NFR-11 | 4, 14, 15, 17, 18 |
 
@@ -296,3 +312,4 @@ Structured logs without personal data beyond ids; error tracking hosted in Canad
 | 1.1 | 23 Oct 2026 | Migration 004 built (company settings, teams, locations, secondary managers, employee number, work days and hours per day). Added section 10.1 on time zones and `requester_time_zone` on requests. T4 and T5 resolved. Documentation updated after each merged feature. |
 | 1.2 | 23 Oct 2026 | Migration 005 (import_batches) built for bulk import of people. Model delegation rule added to the delivery process. |
 | 1.3 | 23 Oct 2026 | Migration 006 built: plans, levels, assignments, append-only accrual ledger, statutory reference rules. Section 8 rewritten for the built engine. Testing, known limitations and traceability updated. 124 automated tests. |
+| 1.4 | 24 Oct 2026 | Migrations 007 to 011 built: requests, request days, approval steps, reminder settings and backups, company holidays, calendar feeds, report company name. Sections 9, 10 and 12 rewritten for what is built. Security, limitations, T2 and traceability updated. 191 automated tests. |
