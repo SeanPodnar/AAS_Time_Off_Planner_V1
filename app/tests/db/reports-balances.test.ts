@@ -11,7 +11,7 @@ const today = todayIn("America/Toronto");
 const yearEnd = `${today.slice(0, 4)}-12-31`;
 
 describe.skipIf(!hasDb)("balance reports", () => {
-  let A: string, B: string, priya: string, tx1: string, ca1: string, on1: string, on2: string, vacation: string, thin: string;
+  let A: string, B: string, priya: string, tx1: string, ca1: string, on1: string, on2: string, vacation: string;
   const admin = () => ({ personId: priya, role: "admin" as const });
   const as = (): RunAs => ({ tenantId: A, timeZone: "America/Toronto", runByName: "Priya Shah" });
   const run = async (key: string, f = {}) => (await runReport(admin(), as(), key, f))!;
@@ -38,7 +38,7 @@ describe.skipIf(!hasDb)("balance reports", () => {
       return p.id as string;
     });
     vacation = await plan(A, "Vacation", 15, [tx1, ca1, on1]);
-    thin = await plan(A, "Thin vacation", 10, [on2]);
+    await plan(A, "Thin vacation", 10, [on2]);
     await plan(B, "Vacation", 20, [other]);
   });
   afterAll(closeDb);
