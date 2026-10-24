@@ -131,7 +131,8 @@ export async function liabilityHours(ctx: RunContext, f: ReportFilter): Promise<
     }
     const group = (key: "team" | "location") => {
       const m = new Map<string, number>();
-      for (const r of rows) m.set(String(r[key] ?? "None"), r3((m.get(String(r[key] ?? "None")) ?? 0) + (r.hours as number)));
+      const none = key === "team" ? "No team" : "No location";
+      for (const r of rows) m.set(String(r[key] ?? none), r3((m.get(String(r[key] ?? none)) ?? 0) + (r.hours as number)));
       return [...m].sort((a, b) => a[0].localeCompare(b[0])).map(([k, v]) => `${k}: ${v} hours`).join("; ");
     };
     const notes = rows.length ? [`By team: ${group("team")}`, `By location: ${group("location")}`, "Vacation plans and plans marked \"pay out unused\". Dollar values come with the salary table (backlog)."] : [];

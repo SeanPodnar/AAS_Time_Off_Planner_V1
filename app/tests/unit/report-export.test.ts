@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { strFromU8, unzipSync } from "fflate";
 import { fileName, safeText, toCsv, toXlsx } from "../../src/lib/reports/export";
-import { totalsRow, type Report } from "../../src/lib/reports/types";
+import { formatDate, runLabel, totalsRow, type Report } from "../../src/lib/reports/types";
 
 const columns = [
   { key: "person", label: "Person", type: "text" as const },
@@ -48,5 +48,12 @@ describe("report export", () => {
 
   it("names files after the report and date", () => {
     expect(fileName(report, "xlsx", "2026-10-24")).toBe("who-s-out-2026-10-24.xlsx");
+  });
+
+  it("uses one date format and labels the run in the company's time zone", () => {
+    expect(formatDate("2026-09-07")).toBe("7 Sep 2026");
+    const ctx = { tenantId: "t", companyName: "N", timeZone: "America/Toronto", runBy: "Priya Shah", now: new Date("2026-10-24T00:17:00Z") };
+    expect(runLabel(ctx)).toBe("Run on 23 Oct 2026, 20:17 EDT by Priya Shah");
+    expect(runLabel({ ...ctx, timeZone: "America/Vancouver" })).toBe("Run on 23 Oct 2026, 17:17 PDT by Priya Shah");
   });
 });

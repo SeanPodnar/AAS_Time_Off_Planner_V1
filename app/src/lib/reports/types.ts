@@ -30,13 +30,18 @@ export type ReportFilter = {
 
 export type RunContext = { tenantId: string; companyName: string; timeZone: string; runBy: string; now?: Date };
 
-const fmtDate = (d: ISODate) => new Date(`${d}T12:00:00Z`).toLocaleDateString("en-CA", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }).replace(/\./g, "");
-export const formatDate = fmtDate;
+/** "24 Oct 2026": the one date format used in every report, on screen and in files. */
+export function formatDate(d: ISODate): string {
+  return new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }).format(new Date(`${d}T12:00:00Z`)).replace("Sept", "Sep");
+}
 
+/** "Run on 23 Oct 2026, 20:17 EDT by Priya Shah", in the company's time zone. */
 export function runLabel(ctx: RunContext): string {
   const now = ctx.now ?? new Date();
-  const when = new Intl.DateTimeFormat("en-CA", { timeZone: ctx.timeZone, day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false, timeZoneName: "short" }).format(now).replace(/\./g, "");
-  return `Run on ${when} by ${ctx.runBy}`;
+  const day = new Intl.DateTimeFormat("en-CA", { timeZone: ctx.timeZone }).format(now);
+  const time = new Intl.DateTimeFormat("en-GB", { timeZone: ctx.timeZone, hour: "2-digit", minute: "2-digit", hour12: false }).format(now);
+  const zone = new Intl.DateTimeFormat("en-US", { timeZone: ctx.timeZone, timeZoneName: "short" }).formatToParts(now).find((x) => x.type === "timeZoneName")?.value ?? ctx.timeZone;
+  return `Run on ${formatDate(day)}, ${time} ${zone} by ${ctx.runBy}`;
 }
 
 /** Sums the number columns named in `keys` into a totals row labelled in the first column. */

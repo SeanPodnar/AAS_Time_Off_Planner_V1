@@ -86,3 +86,8 @@ td.wrapcell { white-space: normal; min-width: 180px; }
 .legend .chip { display: inline-block; min-width: 2.2em; text-align: center; font-weight: 700; border-radius: 6px; padding: 1px 6px; margin-right: 6px; background: color-mix(in oklab, var(--brand) 35%, var(--surface)); border: 2px solid transparent; }
 .legend .chip.pending { background: transparent; border: 2px dashed var(--brand); }
 .linkbox { font-family: ui-monospace, monospace; font-size: .82rem; }
+.report-table th.num, .report-table td.num { text-align: right; }
+.report-table th a { color: inherit; text-decoration: none; }
+.report-table th a:hover { text-decoration: underline; }
+.report-table tfoot td { font-weight: 700; border-top: 2px solid var(--line); background: var(--surface-2); }
+.report-table td.wrapcell { white-space: normal; min-width: 220px; }
