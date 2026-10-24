@@ -8,6 +8,8 @@ import { companyFor } from "@/lib/requests/company";
 import { listMyRequests } from "@/lib/requests/service";
 import { approvalsBadge } from "./requests/context";
 import { RequestsTable } from "./requests/RequestsTable";
+import { myFeeds } from "@/lib/calendar/service";
+import { FeedLinks, type FeedItem } from "./calendar/FeedLinks";
 
 const REQUESTED: Record<string, string> = {
   "1": "Your request was sent for approval.",
@@ -41,7 +43,14 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ r
   const sp = await searchParams;
   const company = await companyFor(site);
   const actor = { personId: user.personId, role: user.role };
-  const [mine, approvals] = await Promise.all([listMyRequests(company, actor), approvalsBadge(company, actor)]);
+  const [mine, approvals, feedInfo] = await Promise.all([listMyRequests(company, actor), approvalsBadge(company, actor), myFeeds(company, actor)]);
+  const feedFor = (scope: FeedItem["scope"]) => feedInfo.feeds.find((f) => f.scope === scope);
+  const base: Omit<FeedItem, "createdAt" | "lastUsedAt">[] = [
+    { scope: "me", title: "My time off", about: "Your own requests, pending and approved." },
+  ];
+  if (feedInfo.hasTeam) base.push({ scope: "team", title: "My team", about: "Approved time off for your team." });
+  if (feedInfo.canReports) base.push({ scope: "reports", title: "People I manage", about: "Approved time off for the people you manage." });
+  const feedItems: FeedItem[] = base.map((i) => ({ ...i, createdAt: feedFor(i.scope)?.createdAt ?? null, lastUsedAt: feedFor(i.scope)?.lastUsedAt ?? null }));
   const showAll = sp.all === "1";
   const rows = showAll ? mine : mine.filter((r) => r.status !== "superseded");
   const hasPast = mine.some((r) => r.status === "superseded");
@@ -63,6 +72,9 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ r
           {hasPast && <Link className="small" href={showAll ? "/" : "/?all=1"}>{showAll ? "Hide past changes" : "Show past changes"}</Link>}
         </div>
         <RequestsTable rows={rows} viewerId={user.personId} returnTo="/" />
+        <h2>Calendar links</h2>
+        <p className="muted">Add your time off to Google Calendar, Outlook or Apple Calendar. Calendar apps refresh on their own schedule, from minutes to a day.</p>
+        <FeedLinks items={feedItems} />
       </main>
     </div>
   );
